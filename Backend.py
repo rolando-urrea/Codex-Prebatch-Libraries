@@ -9,8 +9,9 @@
 # General.
 LOG_INFO_EVENTS = True
 LOGGER_NAME = "CodexPrebatchBackend"
-# Software base specifications.
-RDBMS = "SQL Server" # Valid options: PostgreSQL ("PostgreSQL"), Microsoft SQL Server ("SQL Server").
+# Software database specifications.
+# Valid options: PostgreSQL ("PostgreSQL"), Microsoft SQL Server ("SQL Server").
+RDBMS = "SQL Server"
 DATABASE = "Process"
 # Process setup.
 POSITION_SLOTS = 16
