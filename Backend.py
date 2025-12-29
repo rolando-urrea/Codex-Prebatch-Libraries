@@ -229,6 +229,10 @@ def get_unit_from_capability(prebatch_path, prebatch_name, capability):
 			return_value = system.tag.read(str(unit["fullPath"]) + "/name").value
 	if return_value == "":
 		return_value = get_default_unit(prebatch_path, prebatch_name)
+		if LOG_INFO_EVENTS:
+			logger = system.util.getLogger(LOGGER_NAME)
+			logger.infof("[%s] get_unit_from_capability() [do]: no unit with the capability %s found; the default unit was assigned (%s)", prebatch_name, capability, return_value)
+			logger = None
 	return return_value
 
 def set_base_execution_plan(prebatch_path, prebatch_name):
