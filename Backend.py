@@ -339,71 +339,63 @@ def calculate(prebatch_path, prebatch_name, tank_path):
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] calculate() [start]", prebatch_name)
 	recipe_id = system.tag.read(prebatch_path + "recipeId").value
-	# Calculate only if there's a valid recipe selected.
-	if recipe_id != "-" and recipe_id != "":
-		recipe_name = system.tag.read(prebatch_path + "recipeName").value
-		# Load module properties.
-		tank_min_volume = system.tag.read(prebatch_path + "tankMinVolume").value
-		units = system.tag.read(prebatch_path + "units").value
-		if LOG_INFO_EVENTS:
-			logger.infof("[%s] calculate() [do]: recipeId: %s, recipeName: %s, units: %d", prebatch_name, recipe_id, recipe_name, units)
-		# Get the dry-base sweeteners and calculate their estimated volume.
-		base_sucrose = system.tag.read("Production/Paragon/Process/recipe/baseSucrose").value
-		base_fructose = system.tag.read("Production/Paragon/Process/recipe/baseFructose").value
-		edulcorant_volume = ((base_sucrose + base_fructose) * units) / SWEETENER_DENSITY
-		# Load the actual content of the tank
-		tank = system.tag.read("Production/Paragon/Process/tank").value
-		tank_object_name = system.tag.read("Production/Paragon/Process/tankObjectName").value
-		tank_water_accum = 0
-		if (tank_object_name is not None):
-			tank_water_accum = system.tag.read("Production/SyrupRoom/Tanks/" + tank_object_name + "/water/accum").value
-		# Calculate the additional amount of water required to agitate the tank before adding concentrate.
-		tank_agitation_water = 0
-		if (edulcorant_volume + tank_water_accum) < tank_min_volume:
-			tank_agitation_water = tank_min_volume - edulcorant_volume - tank_water_accum
-		system.tag.write("Production/Paragon/Process/tankAgitationWater", tank_agitation_water)
-		# Process concentrate.
-		current_execution_plan_position = 0
-		for i in range(POSITION_SLOTS):
-			position_instances = 1
-			# Load evaluation data.
-			process_unit = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/processUnit").value
-			if (process_unit != ""):
-				calculated_mass = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/baseMass").value * units
-				system.tag.writeSynchronous("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/calculatedMass", calculated_mass)
-				# Ensure the water volume is enough for agitation.
-				calculated_water = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/baseWater").value * units
-				unit_min_agitation_volume = 0
-				if (process_unit == "T01"):
-					unit_min_agitation_volume = system.tag.read("Production/Paragon/Tanks/T01/minAgitationVolume").value
-				if (process_unit == "T02"):
-					unit_min_agitation_volume = system.tag.read("Production/Paragon/Tanks/T02/minAgitationVolume").value
-				position_type = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/type").value
-				if ((position_type == 1) and calculated_water < unit_min_agitation_volume):
-					calculated_water = unit_min_agitation_volume
-				system.tag.writeSynchronous("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/calculatedWater", calculated_water)
-				calculated_volume = (calculated_water + calculated_mass)
-				# Calculate and determine if more than 1 slot is required for each position.
-				if (process_unit == "T01"):
-					unit_capacity = system.tag.read("Production/Paragon/Tanks/T01/capacity").value
-					if (unit_capacity > 0):
-						position_instances = int(math.ceil(calculated_volume / unit_capacity))
-					logger.infof("[Paragon] calculate() [do]: unit T-01 found; positionInstances = %d", position_instances)
-				if (process_unit == "T02"):
-					unit_capacity = system.tag.read("Production/Paragon/Tanks/T02/capacity").value
-					if (unit_capacity > 0):
-						position_instances = int(math.ceil(calculated_volume / unit_capacity))
-					logger.infof("[Paragon] calculate() [do]: unit T-02 found; positionInstances = %d", position_instances)
-				# Assign position(s) in the execution plan.
-				current_execution_plan_position += 1
-				copy_position("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/", "Production/Paragon/Process/executionPlan/cition" + ("%02d" % current_execution_plan_position) + "/", position_instances)
-		system.tag.writeSynchronous("Production/Paragon/Process/maxPosition", current_execution_plan_position, 5000)
-	# Initialize if there"s no valid recipe.
-	else:
-		logger.info("[Paragon] calculate() [do]: no recipe selected")
-		system.tag.write("Production/Paragon/Process/units", 1)
-		system.tag.write("Production/Paragon/Process/units.EngLow", 1)
-		system.tag.write("Production/Paragon/Process/units.EngHigh", 20)
+	recipe_name = system.tag.read(prebatch_path + "recipeName").value
+	# Load module properties.
+	tank_min_volume = system.tag.read(prebatch_path + "tankMinVolume").value
+	units = system.tag.read(prebatch_path + "units").value
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] calculate() [do]: recipeId: %s, recipeName: %s, units: %d", prebatch_name, recipe_id, recipe_name, units)
+	# Get the dry-base sweeteners and calculate their estimated volume.
+	base_sucrose = system.tag.read("Production/Paragon/Process/recipe/baseSucrose").value
+	base_fructose = system.tag.read("Production/Paragon/Process/recipe/baseFructose").value
+	edulcorant_volume = ((base_sucrose + base_fructose) * units) / SWEETENER_DENSITY
+	# Load the actual content of the tank
+	tank = system.tag.read("Production/Paragon/Process/tank").value
+	tank_object_name = system.tag.read("Production/Paragon/Process/tankObjectName").value
+	tank_water_accum = 0
+	if (tank_object_name is not None):
+		tank_water_accum = system.tag.read("Production/SyrupRoom/Tanks/" + tank_object_name + "/water/accum").value
+	# Calculate the additional amount of water required to agitate the tank before adding concentrate.
+	tank_agitation_water = 0
+	if (edulcorant_volume + tank_water_accum) < tank_min_volume:
+		tank_agitation_water = tank_min_volume - edulcorant_volume - tank_water_accum
+	system.tag.write("Production/Paragon/Process/tankAgitationWater", tank_agitation_water)
+	# Process concentrate.
+	current_execution_plan_position = 0
+	for i in range(POSITION_SLOTS):
+		position_instances = 1
+		# Load evaluation data.
+		process_unit = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/processUnit").value
+		if (process_unit != ""):
+			calculated_mass = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/baseMass").value * units
+			system.tag.writeSynchronous("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/calculatedMass", calculated_mass)
+			# Ensure the water volume is enough for agitation.
+			calculated_water = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/baseWater").value * units
+			unit_min_agitation_volume = 0
+			if (process_unit == "T01"):
+				unit_min_agitation_volume = system.tag.read("Production/Paragon/Tanks/T01/minAgitationVolume").value
+			if (process_unit == "T02"):
+				unit_min_agitation_volume = system.tag.read("Production/Paragon/Tanks/T02/minAgitationVolume").value
+			position_type = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/type").value
+			if ((position_type == 1) and calculated_water < unit_min_agitation_volume):
+				calculated_water = unit_min_agitation_volume
+			system.tag.writeSynchronous("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/calculatedWater", calculated_water)
+			calculated_volume = (calculated_water + calculated_mass)
+			# Calculate and determine if more than 1 slot is required for each position.
+			if (process_unit == "T01"):
+				unit_capacity = system.tag.read("Production/Paragon/Tanks/T01/capacity").value
+				if (unit_capacity > 0):
+					position_instances = int(math.ceil(calculated_volume / unit_capacity))
+				logger.infof("[Paragon] calculate() [do]: unit T-01 found; positionInstances = %d", position_instances)
+			if (process_unit == "T02"):
+				unit_capacity = system.tag.read("Production/Paragon/Tanks/T02/capacity").value
+				if (unit_capacity > 0):
+					position_instances = int(math.ceil(calculated_volume / unit_capacity))
+				logger.infof("[Paragon] calculate() [do]: unit T-02 found; positionInstances = %d", position_instances)
+			# Assign position(s) in the execution plan.
+			current_execution_plan_position += 1
+			copy_position("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/", "Production/Paragon/Process/executionPlan/cition" + ("%02d" % current_execution_plan_position) + "/", position_instances)
+	system.tag.writeSynchronous("Production/Paragon/Process/maxPosition", current_execution_plan_position, 5000)
 	logger.info("[Paragon] calculate() [end]")
 	del logger
 
