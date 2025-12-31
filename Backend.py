@@ -34,6 +34,31 @@ def mark_process_end(prebatch_name):
 		logger.infof("[%s] *** Process END ***", prebatch_name)
 		logger = None
 
+def start_conditions_ready(prebatch_path, prebatch_name):
+	# Checks if all the start base conditions are met.
+	# TODO: add external batch management conditions (Prebatch and Tank allocated, as well as the concentrate dosing phases active).
+	logger = system.util.getLogger(LOGGER_NAME)
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] start_conditions_ready() [start]", prebatch_name)
+	# The main condition is there should be only one default unit, assigned to a common tank.
+	only_one_default_unit = False
+	default_unit_is_common = False
+	units_path = prebatch_path + "Units/"
+	units = system.tag.browse(path=units_path, recursive=False)
+	default_unit_count = 0
+	for unit in units:
+		if system.tag.read(str(unit["fullPath"]) + "/capabilities/isDefault").value:
+			default_unit_count += 1
+			if system.tag.read(str(unit["fullPath"]) + "/capabilities/common").value:
+				default_unit_is_common = True
+	if default_unit_count == 1:
+		only_one_default_unit = True
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] start_conditions_ready() [end]", prebatch_name)
+	logger = None
+	return default_unit_is_common and only_one_default_unit
+
+
 def clear_component(component_path):
 	# Don't consider this function in the logger's scope; it would produce too much detail.
 	system.tag.writeBlocking(component_path + "componentId", "")
