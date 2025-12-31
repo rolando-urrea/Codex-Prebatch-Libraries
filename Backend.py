@@ -34,7 +34,7 @@ def mark_process_end(prebatch_name):
 		logger.infof("[%s] *** Process END ***", prebatch_name)
 		logger = None
 
-def start_conditions_ready(prebatch_path, prebatch_name):
+def machine_conditions_ready(prebatch_path, prebatch_name):
 	# Checks if all the start base conditions are met.
 	# TODO: add external batch management conditions (Prebatch and Tank allocated, as well as the concentrate dosing phases active).
 	logger = system.util.getLogger(LOGGER_NAME)
