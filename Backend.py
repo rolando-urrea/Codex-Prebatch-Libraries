@@ -37,6 +37,7 @@ def mark_process_end(prebatch_name):
 def machine_conditions_ready(prebatch_path, prebatch_name):
 	# Checks if all the start base conditions are met.
 	# TODO: add external batch management conditions (Prebatch and Tank allocated, as well as the concentrate dosing phases active).
+	# TODO: create a memory tag to indicate there's a problem with the machine conditions; this should prevent the logger from creating constant entries if the error persists.
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] start_conditions_ready() [start]", prebatch_name)
@@ -53,11 +54,16 @@ def machine_conditions_ready(prebatch_path, prebatch_name):
 				default_unit_is_common = True
 	if default_unit_count == 1:
 		only_one_default_unit = True
+	# Inform there should be only one default unit.
+	if default_unit_count != 1:
+		logger.errorf("[%s] start_conditions_ready() [error]: there should be only one default unit", prebatch_name)
+	# The default unit must be of the common type.
+	if not default_unit_is_common:
+		logger.errorf("[%s] start_conditions_ready() [error]: the default unit must have the 'common' capability", prebatch_name)
 	if LOG_INFO_EVENTS:
-		logger.infof("[%s] start_conditions_ready() [end]", prebatch_name)
+		logger.infof("[%s] start_conditions_ready() [end]: %b", prebatch_name, default_unit_is_common and only_one_default_unit)
 	logger = None
 	return default_unit_is_common and only_one_default_unit
-
 
 def clear_component(component_path):
 	# Don't consider this function in the logger's scope; it would produce too much detail.
