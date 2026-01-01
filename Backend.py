@@ -355,7 +355,7 @@ def set_base_execution_plan(prebatch_path, prebatch_name):
 			# Heating.
 			if system.tag.read(component_path + "requiresHeating").value:
 				system.tag.writeBlocking(position_path + "requiresHeating", True)
-				process_unit = get_unit_from_capability(prebatch_path, prebatch_name, "heating")
+				process_unit = get_unit_from_capability(prebatch_path, prebatch_name, "requiresHeating")
 			# Finally, assign the process unit to the position.
 			if first_item:
 				system.tag.writeBlocking(position_path + "processUnit", process_unit)
