@@ -122,10 +122,10 @@ def clear_recipe(recipe_path, prebatch_name):
 		clear_all_components(recipe_path, prebatch_name)
 	except:
 		logger.errorf("[%s] clear_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] clear_recipe() [end]", prebatch_name)
 		logger = None
-	if LOG_INFO_EVENTS:
-		logger.infof("[%s] clear_recipe() [end]", prebatch_name)
-	logger = None
 
 def clear_all_recipes(prebatch_path, prebatch_name):
 	recipes = ["baseRecipe", "productionRecipe"]
@@ -206,10 +206,10 @@ def load_recipe(prebatch_path, prebatch_name, recipe_id):
 		recipe_table= None
 	except:
 		logger.errorf("[%s] load_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] load_recipe() [end]: %s (%s)", prebatch_name, recipe_id, recipe_name)
 		logger = None
-	if LOG_INFO_EVENTS:
-		logger.infof("[%s] load_recipe() [end]: %s (%s)", prebatch_name, recipe_id, recipe_name)
-	logger = None
 
 def clear_execution_position(position_path):
 	# Don't consider this function in the logger's scope; it would produce too much detail.
@@ -365,12 +365,13 @@ def set_base_execution_plan(prebatch_path, prebatch_name):
 				first_item = False
 	except:
 		logger.errorf("[%s] set_base_execution_plan() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
+			logger.infof("[%s] set_base_execution_plan() for %s [end]", prebatch_name, recipe_name)
 		logger = None
-	if LOG_INFO_EVENTS:
-		recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
-		logger.infof("[%s] set_base_execution_plan() for %s [end]", prebatch_name, recipe_name)
 
-def set_unit_limit(prebatch_path, prebatch_name, units, tank_path):
+def set_unit_limit(prebatch_path, prebatch_name, tank_path):
 	# Define the unit limit for this recipe/tank combination.
 	logger = system.util.getLogger(LOGGER_NAME)
 	recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
@@ -378,8 +379,8 @@ def set_unit_limit(prebatch_path, prebatch_name, units, tank_path):
 		logger.infof("[%s] set_unit_limit() for %s [start]", prebatch_name, recipe_name)
 	try:
 		recipe_path = prebatch_path + "Process/baseRecipe/"
-		recipe_volume = system.tag.read(recipe_path + "baseVolume").value
-		tank = system.tag.read(prebatch_path + "tank").value
+		recipe_volume = system.tag.read(recipe_path + "volume").value
+		tank = system.tag.read(prebatch_path + "Process/tank").value
 		tank_min_volume = system.tag.read(tank_path + "Par/minAgitationVolume").value
 		tank_max_volume = system.tag.read(tank_path + "Par/capacity").value
 		if LOG_INFO_EVENTS:
@@ -407,27 +408,26 @@ def set_unit_limit(prebatch_path, prebatch_name, units, tank_path):
 				tank_agitation_water = tank_min_volume - sweetener_volume
 			prebatch_water = 0
 			for i in range(1, POSITION_SLOTS + 1):
-				process_unit = system.tag.read(prebatch_path + "baseExecutionPlan/Positions/p" + ("%02d" % i) + "/processUnit").value
-				calculated_mass = system.tag.read(prebatch_path + "baseExecutionPlan/Positions/p" + ("%02d" % i) + "/mass").value * test_units
-				calculated_water = system.tag.read(prebatch_path + "baseExecutionPlan/Positions/p" + ("%02d" % i) + "/water").value * test_units
-				conc_type = system.tag.read(prebatch_path + "baseExecutionPlan/Positions/p" + ("%02d" % i) + "/type").value
+				process_unit = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/processUnit").value
+				calculated_mass = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/mass").value * test_units
+				calculated_water = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/water").value * test_units
+				conc_type = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/type").value
 				# Empty slots will have the Process Unit tag equal to "".
 				if process_unit != "":
-					pu_min_volume = system.tag.read("Production/Paragon/Tanks/T01/minAgitationVolume").value
-					pu_max_volume = system.tag.read("Production/Paragon/Tanks/T01/capacity").value
-					if ((pu_min_volume > calculated_water) and (conc_type == 1)):
-						calculated_water = pu_min_volume
-					calculated_water += system.tag.read("Production/Paragon/Tanks/T01/rinseVolume").value
-				if (process_unit == "T02"):
-					pu_min_volume = system.tag.read("Production/Paragon/Tanks/T02/minAgitationVolume").value
-					pu_max_volume = system.tag.read("Production/Paragon/Tanks/T02/capacity").value
-					if ((pu_min_volume > calculated_water) and (conc_type == 1)):
-						calculated_water = pu_min_volume
-					calculated_water += system.tag.read("Production/Paragon/Tanks/T02/rinseVolume").value
-				if (process_unit == "TN01"):
-					calculated_water += system.tag.read("Production/Paragon/Tanks/TN01/rinseVolume").value
+					pu_par_path = prebatch_path + "/Units/" + process_unit + "/Par/"
+					pu_min_water_volume = 0
+					if conc_type == 1:
+						# Prevent a wrong unit configuration for a solid concentrate (the minAgitationVolume tag must exist in the right unit).
+						unit_min_agitation_volume = system.tag.read(pu_par_path + "minAgitationVolume").value
+						if unit_min_agitation_volume is not None:
+							pu_min_water_volume = unit_min_agitation_volume
+					# Compare the calculated water volume with the minimum agitation volume required for the unit.
+					# Liquids will always take the calculated water volume.
+					if pu_min_water_volume < calculated_water:
+						pu_min_water_volume = calculated_water
+					calculated_water = pu_min_water_volume + system.tag.read(pu_par_path + "rinseVolume").value
 				prebatch_water += calculated_water
-			recipe_water = system.tag.read("Production/Paragon/Process/recipe/baseWater").value * test_units
+			recipe_water = system.tag.read(recipe_path + "water").value * test_units
 			required_water = tank_agitation_water + sweetener_water + prebatch_water
 		min_units = 1
 		if test_units < max_units:
@@ -435,15 +435,16 @@ def set_unit_limit(prebatch_path, prebatch_name, units, tank_path):
 		if min_units < 1:
 			min_units = 1
 		logger.infof("[%s] set_unit_limit() [do]: min_units: %d, volume: %.2f L", prebatch_name, min_units, recipe_volume * min_units)
-		system.tag.write(prebatch_path + "userUnits.EngLow", min_units)
-		system.tag.write(prebatch_path + "userUnits.EngHigh", max_units)
-		system.tag.write(prebatch_path + "userUnits", min_units)
-		system.tag.write(prebatch_path + "unitLimitSet", True)
+		system.tag.write(prebatch_path + "Process/userUnits.EngLow", min_units)
+		system.tag.write(prebatch_path + "Process/userUnits.EngHigh", max_units)
+		system.tag.write(prebatch_path + "Process/userUnits", min_units)
+		system.tag.write(prebatch_path + "Process/unitLimitSet", True)
 	except:
 		logger.errorf("[%s] set_unit_limit() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] set_unit_limit() for %s [end]", prebatch_name, recipe_name)
 		logger = None
-	if LOG_INFO_EVENTS:
-		logger.infof("[%s] set_unit_limit() for %s [end]", prebatch_name, recipe_name)
 
 def calculate(prebatch_path, prebatch_name, units, tank_path):
 	import math
