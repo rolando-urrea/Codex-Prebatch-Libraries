@@ -73,9 +73,9 @@ def clear_component(component_path):
 	system.tag.writeBlocking(component_path + "componentName", "")
 	system.tag.writeBlocking(component_path + "componentVersion", 0)
 	system.tag.writeBlocking(component_path + "transferPosition", 0)
+	system.tag.writeBlocking(component_path + "type", 0)
 	system.tag.writeBlocking(component_path + "mass", 0)
 	system.tag.writeBlocking(component_path + "water", 0)
-	system.tag.writeBlocking(component_path + "type", 0)
 	system.tag.writeBlocking(component_path + "hardDissolving", False)
 	system.tag.writeBlocking(component_path + "vacuumPump", False)
 	system.tag.writeBlocking(component_path + "bayonet", False)
@@ -188,9 +188,9 @@ def load_recipe(prebatch_path, prebatch_name, recipe_id):
 					system.tag.writeBlocking(component_path + "componentName", component_data_row["component_name"])
 					system.tag.writeBlocking(component_path + "componentVersion", component_data_row["component_version"])
 					system.tag.writeBlocking(component_path + "transferPosition", [recipe_data_row["c" + str("%02d" % i) + "_pos"]])
+					system.tag.writeBlocking(component_path + "type", component_data_row["component_type"])
 					system.tag.writeBlocking(component_path + "mass", component_data_row["mass"])
 					system.tag.writeBlocking(component_path + "water", component_data_row["water"])
-					system.tag.writeBlocking(component_path + "type", component_data_row["component_type"])
 					system.tag.writeBlocking(component_path + "hardDissolving", component_data_row["hard_dissolving"])
 					system.tag.writeBlocking(component_path + "vacuumPump", component_data_row["vacuum_pump"])
 					system.tag.writeBlocking(component_path + "bayonet", component_data_row["bayonet"])
@@ -380,6 +380,7 @@ def set_unit_limit(prebatch_path, prebatch_name, tank_path):
 	try:
 		recipe_path = prebatch_path + "Process/baseRecipe/"
 		recipe_volume = system.tag.read(recipe_path + "volume").value
+		# Get the tank's properties.
 		tank = system.tag.read(prebatch_path + "Process/tank").value
 		tank_min_volume = system.tag.read(tank_path + "Par/minAgitationVolume").value
 		tank_max_volume = system.tag.read(tank_path + "Par/capacity").value
@@ -409,12 +410,12 @@ def set_unit_limit(prebatch_path, prebatch_name, tank_path):
 			prebatch_water = 0
 			for i in range(1, POSITION_SLOTS + 1):
 				process_unit = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/processUnit").value
-				calculated_mass = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/mass").value * test_units
-				calculated_water = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/water").value * test_units
-				conc_type = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/type").value
+				calculated_water = 0
 				# Empty slots will have the Process Unit tag equal to "".
 				if process_unit != "":
-					pu_par_path = prebatch_path + "/Units/" + process_unit + "/Par/"
+					calculated_water = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/water").value * test_units
+					conc_type = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/type").value
+					pu_par_path = prebatch_path + "Units/" + process_unit + "/Par/"
 					pu_min_water_volume = 0
 					if conc_type == 1:
 						# Prevent a wrong unit configuration for a solid concentrate (the minAgitationVolume tag must exist in the right unit).
@@ -446,45 +447,52 @@ def set_unit_limit(prebatch_path, prebatch_name, tank_path):
 			logger.infof("[%s] set_unit_limit() for %s [end]", prebatch_name, recipe_name)
 		logger = None
 
-def calculate(prebatch_path, prebatch_name, units, tank_path):
+def calculate(prebatch_path, prebatch_name, tank_path, units):
 	import math
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] calculate() [start]", prebatch_name)
-	recipe_id = system.tag.read(prebatch_path + "recipeId").value
-	recipe_name = system.tag.read(prebatch_path + "recipeName").value
-	# Load module properties.
-	tank_min_volume = system.tag.read(prebatch_path + "tankMinVolume").value
-	units = system.tag.read(prebatch_path + "units").value
+	recipe_path = prebatch_path + "Process/baseRecipe/"
+	recipe_id = system.tag.read(recipe_path + "recipeId").value
+	recipe_name = system.tag.read(recipe_path + "recipeName").value
+	# Get the tank's properties.
+	tank = system.tag.read(prebatch_path + "Process/tank").value
+	tank_min_volume = system.tag.read(tank_path + "Par/minAgitationVolume").value
+	tank_max_volume = system.tag.read(tank_path + "Par/capacity").value
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] calculate() [do]: recipeId: %s, recipeName: %s, units: %d", prebatch_name, recipe_id, recipe_name, units)
 	# Get the dry-base sweeteners and calculate their estimated volume.
-	base_sucrose = system.tag.read("Production/Paragon/Process/recipe/baseSucrose").value
-	base_fructose = system.tag.read("Production/Paragon/Process/recipe/baseFructose").value
+	base_sucrose = system.tag.read(recipe_path + "sucrose").value
+	base_fructose = system.tag.read(recipe_path + "fructose").value
 	sweetener_volume = ((base_sucrose + base_fructose) * units) / SWEETENER_DENSITY
 	# Load the actual content of the tank
-	tank = system.tag.read("Production/Paragon/Process/tank").value
-	tank_object_name = system.tag.read("Production/Paragon/Process/tankObjectName").value
+	tank_object_name = system.tag.read(tank_path + "name").value
 	tank_water_accum = 0
 	if tank_object_name is not None:
-		tank_water_accum = system.tag.read("Production/SyrupRoom/Tanks/" + tank_object_name + "/water/accum").value
+		tank_water_accum = system.tag.read(tank_path + "Accum/water").value
 	# Calculate the additional amount of water required to agitate the tank before adding concentrate.
 	tank_agitation_water = 0
 	if (sweetener_volume + tank_water_accum) < tank_min_volume:
 		tank_agitation_water = tank_min_volume - sweetener_volume - tank_water_accum
-	system.tag.write("Production/Paragon/Process/tankAgitationWater", tank_agitation_water)
+	system.tag.writeBlocking(prebatch_path + "Process/tankAgitationWater", tank_agitation_water)
 	# Process concentrate.
 	current_execution_plan_position = 0
-	for i in range(POSITION_SLOTS):
+	for i in range(1, POSITION_SLOTS + 1):
 		position_instances = 1
 		# Load evaluation data.
-		process_unit = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/processUnit").value
-		if (process_unit != ""):
-			calculated_mass = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/baseMass").value * units
-			system.tag.writeSynchronous("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/calculatedMass", calculated_mass)
+		process_unit = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/´" + ("%02d" % i) + "/processUnit").value
+		# Empty slots will have the Process Unit tag equal to "".
+		if process_unit != "":
+			calculated_mass = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/mass").value * units
+			system.tag.writeBlocking(prebatch_path + "Process/productionExecutionPlan/Positions/p" + ("%02d" % i) + "/mass", calculated_mass)
 			# Ensure the water volume is enough for agitation.
-			calculated_water = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/baseWater").value * units
+			calculated_water = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/water").value * units
 			unit_min_agitation_volume = 0
+
+
+
+
+
 			if (process_unit == "T01"):
 				unit_min_agitation_volume = system.tag.read("Production/Paragon/Tanks/T01/minAgitationVolume").value
 			if (process_unit == "T02"):
