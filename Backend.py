@@ -478,45 +478,43 @@ def calculate(prebatch_path, prebatch_name, tank_path, units):
 	# Process concentrate.
 	current_execution_plan_position = 0
 	for i in range(1, POSITION_SLOTS + 1):
+		# Define the current positions' paths.
+		current_base_position_path = prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/"
+		current_production_position_path = prebatch_path + "Process/productionExecutionPlan/Positions/p" + ("%02d" % i) + "/"
+		# Initialize the number of instances for this calculated position.
 		position_instances = 1
 		# Load evaluation data.
-		process_unit = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/´" + ("%02d" % i) + "/processUnit").value
+		process_unit = system.tag.read(current_base_position_path + "processUnit").value
 		# Empty slots will have the Process Unit tag equal to "".
 		if process_unit != "":
-			calculated_mass = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/mass").value * units
-			system.tag.writeBlocking(prebatch_path + "Process/productionExecutionPlan/Positions/p" + ("%02d" % i) + "/mass", calculated_mass)
+			calculated_mass = system.tag.read(current_base_position_path + "mass").value * units
+			system.tag.writeBlocking(current_production_position_path + "mass", calculated_mass)
 			# Ensure the water volume is enough for agitation.
-			calculated_water = system.tag.read(prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/water").value * units
-			unit_min_agitation_volume = 0
-
-
-
-
-
-			if (process_unit == "T01"):
-				unit_min_agitation_volume = system.tag.read("Production/Paragon/Tanks/T01/minAgitationVolume").value
-			if (process_unit == "T02"):
-				unit_min_agitation_volume = system.tag.read("Production/Paragon/Tanks/T02/minAgitationVolume").value
-			position_type = system.tag.read("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/type").value
-			if ((position_type == 1) and calculated_water < unit_min_agitation_volume):
-				calculated_water = unit_min_agitation_volume
-			system.tag.writeSynchronous("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/calculatedWater", calculated_water)
-			calculated_volume = (calculated_water + calculated_mass)
-			# Calculate and determine if more than 1 slot is required for each position.
-			if (process_unit == "T01"):
-				unit_capacity = system.tag.read("Production/Paragon/Tanks/T01/capacity").value
-				if (unit_capacity > 0):
-					position_instances = int(math.ceil(calculated_volume / unit_capacity))
-				logger.infof("[Paragon] calculate() [do]: unit T-01 found; positionInstances = %d", position_instances)
-			if (process_unit == "T02"):
-				unit_capacity = system.tag.read("Production/Paragon/Tanks/T02/capacity").value
-				if (unit_capacity > 0):
-					position_instances = int(math.ceil(calculated_volume / unit_capacity))
-				logger.infof("[Paragon] calculate() [do]: unit T-02 found; positionInstances = %d", position_instances)
-			# Assign position(s) in the execution plan.
-			current_execution_plan_position += 1
-			copy_position("Production/Paragon/Process/baseExecutionPlan/cition" + ("%02d" % (i + 1)) + "/", "Production/Paragon/Process/executionPlan/cition" + ("%02d" % current_execution_plan_position) + "/", position_instances)
-	system.tag.writeSynchronous("Production/Paragon/Process/maxPosition", current_execution_plan_position, 5000)
+			# Liquids will always take the calculated water volume.
+			calculated_water = system.tag.read(current_base_position_path + "water").value * units
+			pu_min_water_volume = 0
+			components = system.tag.read(current_base_position_path + "components").value
+			conc_type = system.tag.read(current_base_position_path + "type").value
+			pu_par_path = prebatch_path + "Units/" + process_unit + "/Par/"
+			cycles = 1
+			if conc_type == 1:
+				# Prevent a wrong unit configuration for a solid concentrate (the minAgitationVolume tag must exist in the right unit).
+				unit_min_agitation_volume = system.tag.read(pu_par_path + "minAgitationVolume").value
+				if unit_min_agitation_volume is not None:
+					pu_min_water_volume = unit_min_agitation_volume
+				# Compare the calculated water volume with the minimum agitation volume required for the unit.
+				if pu_min_water_volume > calculated_water:
+					calculated_water = pu_min_water_volume
+				# Calculate the required cycles.
+				pu_capacity = system.tag.read(pu_par_path + "capacity").value
+				calculated_volume = (calculated_water + calculated_mass)
+				if pu_capacity is not None:
+					if pu_capacity > 0:
+						cycles = math.ceil(calculated_volume / pu_capacity)
+			if LOG_INFO_EVENTS:
+				logger.infof("[%s] calculate() [do]: unit %s found for %s; cycles = %d", prebatch_name, process_unit, components, cycles)
+			copy_position(current_base_position_path, current_production_position_path, cycles)
+			system.tag.writeBlocking(prebatch_path + "maxPosition", i)
 	logger.info("[Paragon] calculate() [end]")
 	del logger
 
@@ -805,7 +803,7 @@ def process_component(position, in_transfer_position):
 
 def copy_position(origin, destination, partitions):
 	logger = system.util.getLogger(LOGGER_NAME)
-	logger.infof("[Paragon] copy_position(origin: %s, destination: %s) [start]", origin, destination)	
+	logger.infof("[Paragon] copy_position(origin: %s, destination: %s) [start]", origin, destination)
 	# Verify that all properties from the object are in this function.
 	# Certain tags have to be written synchronously to avoid write speed problems.
 	system.tag.writeSynchronous(destination + "position", system.tag.read(origin + "position").value, 5000)
