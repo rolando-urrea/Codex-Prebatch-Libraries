@@ -288,7 +288,7 @@ def copy_position(source_position_path, target_position_path, cycles):
 	# system.tag.writeBlocking(target_position_path + "water", system.tag.read(source_position_path + "water").value)
 	system.tag.writeBlocking(target_position_path + "cycles", cycles)
 
-def get_default_unit(prebatch_path, prebatch_name):
+def get_default_unit(prebatch_path):
 	# Don't consider this function in the logger's scope; it would produce too much detail.
 	return_value = ""
 	units_path = prebatch_path + "Units/"
@@ -308,7 +308,7 @@ def get_unit_from_capability(prebatch_path, prebatch_name, capability):
 		if system.tag.read(str(unit["fullPath"]) + "/capabilities/" + capability).value:
 			return_value = system.tag.read(str(unit["fullPath"]) + "/name").value
 	if return_value == "":
-		return_value = get_default_unit(prebatch_path, prebatch_name)
+		return_value = get_default_unit(prebatch_path)
 		if LOG_INFO_EVENTS:
 			logger = system.util.getLogger(LOGGER_NAME)
 			logger.infof("[%s] get_unit_from_capability() [do]: no unit with the capability %s found; the default unit was assigned (%s)", prebatch_name, capability, return_value)
@@ -576,39 +576,53 @@ def calculate(prebatch_path, prebatch_name, tank_path, units):
 			logger.infof("[%s] calculate() [end]", prebatch_name)
 		del logger
 
-def save_process_data():
+def save_process_data(prebatch_path, prebatch_name):
 	logger = system.util.getLogger(LOGGER_NAME)
-	logger.info("[Paragon] save_process_data() [start]")
-	current_id = system.tag.read("Production/Paragon/Process/processId").value
-	if (current_id == 0):
-		database = "Process"
-		headers_table = system.db.runQuery("SELECT process_id FROM pb_recipes_executed ORDER BY process_id DESC LIMIT 1", database)
-		process_id = headers_table[0]["process_id"] + 1
-		tag_path = "Production/Paragon/Process/recipe/"
-		recipe_id = system.tag.read(tag_path + "id").value
-		recipe_name = system.tag.read(tag_path + "name").value
-		recipe_density = system.tag.read(tag_path + "density").value
-		version = system.tag.read(tag_path + "version").value
-		tank = system.tag.read("Production/Paragon/Process/tank").value
-		units = system.tag.read("Production/Paragon/Process/units").value
-		user_name = system.tag.read("Production/Paragon/Process/userName").value
-		update_query = "INSERT INTO pb_recipes_executed (prebatch, tank, process_id, recipe_id, version, units, user_name"
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] save_process_data() [start]", prebatch_name)
+	try:
+		last_stored_process_id = None
+		if RDBMS == "PostgreSQL":
+			last_stored_process_id = system.db.runScalarQuery("SELECT process_id FROM pb_recipes_executed ORDER BY process_id DESC LIMIT 1", DATABASE)
+		if RDBMS == "SQL Server":
+			last_stored_process_id = system.db.runScalarQuery("SELECT TOP 1 process_id FROM pb_recipes_executed ORDER BY process_id DESC", DATABASE)
+		if last_stored_process_id is None:
+			last_stored_process_id = 0
+		process_id = last_stored_process_id + 1
+		prebatch_number = system.tag.read(prebatch_path + "Process/prebatchNumber").value
+		recipe_path = prebatch_path + "Process/baseRecipe/"
+		recipe_id = system.tag.read(recipe_path + "recipeId").value
+		recipe_name = system.tag.read(recipe_path + "recipeName").value
+		recipe_version = system.tag.read(recipe_path + "recipeVersion").value
+		tank = system.tag.read(prebatch_path + "Process/tank").value
+		units = system.tag.read(prebatch_path + "Process/calculatedUnits").value
+		user_name = system.tag.read(prebatch_path + "Process/userName").value
+		update_query = "INSERT INTO pb_recipes_executed (prebatch_number, tank, process_id, recipe_id, recipe_version, units, user_name"
 		for i in range(POSITION_SLOTS):
-			update_query += ", c" + ("%02d" % (i + 1)) + "_version" 
+			update_query += ", c" + ("%02d" % (i + 1)) + "_version"
 		update_query += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		system.db.runPrepUpdate(update_query, [1, tank, process_id, recipe_id, version, units, user_name, system.tag.read(tag_path + "Components/c01/version").value, system.tag.read(tag_path + "Components/c02/version").value, system.tag.read(tag_path + "Components/c03/version").value, system.tag.read(tag_path + "Components/c04/version").value, system.tag.read(tag_path + "Components/c05/version").value, system.tag.read(tag_path + "Components/c06/version").value, system.tag.read(tag_path + "Components/c07/version").value, system.tag.read(tag_path + "Components/c08/version").value, system.tag.read(tag_path + "Components/c09/version").value, system.tag.read(tag_path + "Components/c10/version").value, system.tag.read(tag_path + "Components/c11/version").value, system.tag.read(tag_path + "Components/c12/version").value, system.tag.read(tag_path + "Components/c13/version").value, system.tag.read(tag_path + "Components/c14/version").value, system.tag.read(tag_path + "Components/c15/version").value, system.tag.read(tag_path + "Components/c16/version").value], database)
+		system.db.runPrepUpdate(update_query, [prebatch_number, tank, process_id, recipe_id, recipe_version, units, user_name,
+											   system.tag.read(recipe_path + "Components/c01/componentVersion").value, system.tag.read(recipe_path + "Components/c02/componentVersion").value,
+											   system.tag.read(recipe_path + "Components/c03/componentVersion").value, system.tag.read(recipe_path + "Components/c04/componentVersion").value,
+											   system.tag.read(recipe_path + "Components/c05/componentVersion").value, system.tag.read(recipe_path + "Components/c06/componentVersion").value,
+											   system.tag.read(recipe_path + "Components/c07/componentVersion").value, system.tag.read(recipe_path + "Components/c08/componentVersion").value,
+											   system.tag.read(recipe_path + "Components/c09/componentVersion").value, system.tag.read(recipe_path + "Components/c10/componentVersion").value,
+											   system.tag.read(recipe_path + "Components/c11/componentVersion").value, system.tag.read(recipe_path + "Components/c12/componentVersion").value,
+											   system.tag.read(recipe_path + "Components/c13/componentVersion").value, system.tag.read(recipe_path + "Components/c14/componentVersion").value,
+											   system.tag.read(recipe_path + "Components/c15/componentVersion").value, system.tag.read(recipe_path + "Components/c16/componentVersion").value], DATABASE)
 		# Update the tank's online contents.
 		# tank_object_name = system.tag.read("Production/Paragon/Process/tankObjectName").value
 		# system.tag.write("Production/SyrupRoom/Tanks/" + tank_object_name + "/recipe/recipeId", recipe_id)
 		# system.tag.write("Production/SyrupRoom/Tanks/" + tank_object_name + "/density", recipe_density)
 		# Indicate the process was stored.
-		system.tag.write("Production/Paragon/Process/processId", process_id)
-		system.tag.write("Production/Paragon/Process/processStored", True)
-		logger.infof("[Paragon] save_process_data() [do]: recipeId: %s, recipeName: %s, processId: %d", recipe_id, recipe_name, process_id)
-	else:
-		logger.info("[Paragon] save_process_data() [do]: id already assigned")
-	logger.info("[Paragon] save_process_data() [end]")
-	del logger
+		system.tag.write(prebatch_path + "Process/processId", process_id)
+	except:
+		logger.errorf("[%s] save_process_data() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] save_process_data() [do]: recipeId: %s, recipeName: %s, processId: %d", prebatch_name, recipe_id, recipe_name, process_id)
+			logger.infof("[%s] save_process_data() [end]", prebatch_name)
+		del logger
 
 def coordinate():
 	import time
@@ -695,47 +709,6 @@ def coordinate_t01():
 				logger.infof("[Paragon] coordinate_t01 [do]: update TRANSFERRED status for %s [%f L", components, total_water)	
 		del logger
 
-def coordinate_t02():
-	process_id = system.tag.read("Production/Paragon/Process/processId").value
-	module_path = "Production/Paragon/Process/T02/"
-	# Obtain the components" position.
-	position = system.tag.read(module_path + "positionObject/cition").value
-	if (position > 0):
-		logger = system.util.getLogger(LOGGER_NAME)
-		database = "Process"
-		components = system.tag.read(module_path + "positionObject/components").value
-		started = system.tag.read(module_path + "start").value
-		water_added = system.tag.read(module_path + "waterComplete").value
-		concentrate_added = system.tag.read(module_path + "concentrateAdded").value
-		agitated = system.tag.read(module_path + "agitationDone").value
-		transferred = system.tag.read(module_path + "transferred").value
-		progress_table = system.db.runQuery("SELECT * FROM pb_recipes_progress_sorted WHERE process_id = " + ("%d" % process_id) + " AND position = " + ("%d" % position), database)
-		# Step 1: started.
-		if (started and not(step_stored(1, progress_table))):
-			system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, position, step) VALUES (?, ?, ?)", [process_id, position, 1], database)
-			logger.infof("[Paragon] coordinate_t02 [do]: update STARTED status for %s", components)	
-		# Step 2: water added.
-		if (started and water_added and not(step_stored(2, progress_table))):
-			water_accum = system.tag.read(module_path + "waterAccum").value
-			system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, position, step, water) VALUES (?, ?, ?, ?)", [process_id, position, 2, water_accum], database)
-			logger.infof("[Paragon] coordinate_t02 [do]: update WATER ADDED status for %s [%f L]", components, water_accum)	
-		# Step 3: concentrate added.
-		if (started and concentrate_added and not(step_stored(3, progress_table))):
-			system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, position, step) VALUES (?, ?, ?)", [process_id, position, 3], database)
-			logger.infof("[Paragon] coordinate_t02 [do]: update CONCENTRATE ADDED status for %s", components)	
-		# Step 4: agitation concluded.
-		if (started and agitated and not(step_stored(4, progress_table))):
-			system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, position, step) VALUES (?, ?, ?)", [process_id, position, 4], database)
-			logger.infof("[Paragon] coordinate_t02 [do]: update AGITATION CONCLUDED status for %s", components)	
-		# Step 5: concentrate transferred.
-		if (started and transferred and not(step_stored(5, progress_table))):
-			total_water = system.tag.read(module_path + "waterTotal").value
-			if (total_water > 0):
-				system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, position, step, water) VALUES (?, ?, ?, ?)", [process_id, position, 5, total_water], database)
-				# system.tag.write("Production/Paragon/Process/T02/transferredConfirmation", 1)
-				logger.infof("[Paragon] coordinate_t02 [do]: update TRANSFERRED status for %s [%f L", components, total_water)	
-		del logger
-
 def coordinate_b01():
 	process_id = system.tag.read("Production/Paragon/Process/processId").value
 	module_path = "Production/Paragon/Process/B01/"
@@ -760,32 +733,6 @@ def coordinate_b01():
 			logger.infof("[Paragon] coordinate_b01 [do]: update TRANSFERRED status for %s", components)	
 		del logger
 
-def coordinate_tn01():
-	process_id = system.tag.read("Production/Paragon/Process/processId").value
-	module_path = "Production/Paragon/Process/TN01/"
-	# Obtain the components" position.
-	position = system.tag.read(module_path + "executionPosition/cition").value
-	if (position > 0):
-		logger = system.util.getLogger(LOGGER_NAME)
-		database = "Process"
-		components = system.tag.read(module_path + "executionPosition/components").value
-		started = system.tag.read(module_path + "start").value
-		finalize = system.tag.read(module_path + "transferred").value
-		progress_table = system.db.runQuery("SELECT * FROM pb_recipes_progress_sorted WHERE process_id = " + ("%d" % process_id) + " AND position = " + ("%d" % position), database)
-		# Step 1: started.
-		if (started and not(step_stored(1, progress_table))):
-			system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, position, step) VALUES (?, ?, ?)", [process_id, position, 1], database)
-			logger.infof("[Paragon] coordinate_tn01 [do]: update STARTED status for %s", components)	
-		# Step 5: concentrate transferred.
-		if (finalize and not(step_stored(5, progress_table))):
-			water_accum = system.tag.read(module_path + "waterAccum").value
-			rinse_accum = system.tag.read(module_path + "Par/rinseAccum").value
-			total_water = water_accum + rinse_accum
-			system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, position, step, water) VALUES (?, ?, ?, ?)", [process_id, position, 5, total_water], database)
-			# system.tag.write("Production/Paragon/Process/TN01/transferredConfirmation", 1)
-			logger.infof("[Paragon] coordinate_tn01 [do]: update TRANSFERRED status for %s", components)	
-		del logger
-
 def step_stored(step, progress_table):
 	result = False
 	for row_index in range(len(progress_table)):
@@ -798,15 +745,15 @@ def initialize_module(position):
 	logger.infof("[Paragon] initialize_module(position: %d) [start]", position)
 	initialization_path = ""
 	unit_to_initialize = ""
-	# Tank T-01.
+	# Tank T-01.
 	if (system.tag.read("Production/Paragon/Tanks/T01/executionPosition/cition").value == position):
 		initialization_path = "Production/Paragon/Tanks/T01/"
 		unit_to_initialize = "T-01"
-	# Tank T-02.
+	# Tank T-02.
 	if (system.tag.read("Production/Paragon/Tanks/T02/executionPosition/cition").value == position):
 		initialization_path = "Production/Paragon/Tanks/T02/"
 		unit_to_initialize = "T-02"
-	# Bayonet 1.
+	# Bayonet 1.
 	if (system.tag.read("Production/Paragon/Tanks/B01/executionPosition/cition").value == position):
 		initialization_path = "Production/Paragon/Tanks/B01/"
 		unit_to_initialize = "B-01"
@@ -859,27 +806,6 @@ def process_component(position, in_transfer_position):
 	logger.infof("[Paragon] process_component(position: %d, in_transfer_position: %s) [end]", position, in_transfer_position)
 	del logger
 
-def copy_position(origin, destination, partitions):
-	logger = system.util.getLogger(LOGGER_NAME)
-	logger.infof("[Paragon] copy_position(origin: %s, destination: %s) [start]", origin, destination)
-	# Verify that all properties from the object are in this function.
-	# Certain tags have to be written synchronously to avoid write speed problems.
-	system.tag.writeSynchronous(destination + "position", system.tag.read(origin + "position").value, 5000)
-	system.tag.writeSynchronous(destination + "processUnit", system.tag.read(origin + "processUnit").value, 5000)
-	system.tag.write(destination + "agitationAutomatic", system.tag.read(origin + "agitationAutomatic").value)
-	system.tag.write(destination + "agitationDuration", system.tag.read(origin + "agitationDuration").value)
-	system.tag.write(destination + "baseMass", system.tag.read(origin + "baseMass").value)
-	system.tag.write(destination + "baseWater", system.tag.read(origin + "baseWater").value)
-	system.tag.write(destination + "calculatedMass", system.tag.read(origin + "calculatedMass").value / partitions)
-	system.tag.write(destination + "calculatedWater", system.tag.read(origin + "calculatedWater").value / partitions)
-	system.tag.write(destination + "cycles", partitions)
-	system.tag.write(destination + "changeAllowed", system.tag.read(origin + "changeAllowed").value)
-	system.tag.writeSynchronous(destination + "components", system.tag.read(origin + "components").value, 5000)
-	system.tag.write(destination + "type", system.tag.read(origin + "type").value)
-	logger.infof("[Paragon] copy_position(origin: %s, destination: %s) [do (%s)]: unit: %s", origin, destination, system.tag.read(destination + "components").value, system.tag.read(origin + "processUnit").value)	
-	logger.infof("[Paragon] copy_position(origin: %s, destination: %s) [end]", origin, destination)
-	del logger
-
 def skip_current_component():
 	logger = system.util.getLogger(LOGGER_NAME)
 	logger.info("[Paragon] skip_current_component [start]")	
@@ -893,10 +819,7 @@ def skip_current_component():
 def cancel_running_recipe():
 	logger = system.util.getLogger(LOGGER_NAME)
 	logger.info("[Paragon] cancel_running_recipe() [start]")	
-	process_id = system.tag.read("Production/Paragon/Process/processId").value
-	if (process_id > 0):
-		database = "Process"
-		system.db.runPrepUpdate("INSERT INTO pb_recipes_canceled (process_id) VALUES (?)", [process_id], database)
+	system.db.runPrepUpdate("INSERT INTO pb_recipes_canceled (process_id) VALUES (?)", [process_id], database)
 	save_final_data_running_recipe()
 	logger.info("[Paragon] cancel_running_recipe() [end]")
 	del logger
@@ -906,19 +829,15 @@ def save_final_data_running_recipe():
 	logger = system.util.getLogger(LOGGER_NAME)
 	logger.info("[Paragon] save_final_data_running_recipe() [start]")
 	store_inventory()
-	process_id = system.tag.read("Production/Paragon/Process/processId").value
-	if (process_id > 0):
-		tank = system.tag.read("Production/Paragon/Process/tank").value
-		recipe_id = system.tag.read("Production/Paragon/Process/recipe/id").value
-		recipe_name = system.tag.read("Production/Paragon/Process/recipe/name").value
-		water = system.tag.read("Production/Paragon/Process/waterAccum").value
-		sucrose = system.tag.read("Production/Paragon/Process/sucroseAccum").value
-		fructose = system.tag.read("Production/Paragon/Process/fructoseAccum").value
-		database = "Process"
-		system.db.runPrepUpdate("INSERT INTO tanks_data (process_id, tank_id, recipe_id, sucrose, fructose, water) VALUES (?, ?, ?, ?, ?, ?)", [process_id, tank, recipe_id, sucrose, fructose, water], database)
-		logger.infof("[Paragon] save_final_data_running_recipe() [do]: recipeId: %s, recipeName: %s, processId: %d", recipe_id, recipe_name, process_id)
-	else:
-		logger.info("[Paragon] save_final_data_running_recipe() [do]: no running process found")
+	tank = system.tag.read("Production/Paragon/Process/tank").value
+	recipe_id = system.tag.read("Production/Paragon/Process/recipe/id").value
+	recipe_name = system.tag.read("Production/Paragon/Process/recipe/name").value
+	water = system.tag.read("Production/Paragon/Process/waterAccum").value
+	sucrose = system.tag.read("Production/Paragon/Process/sucroseAccum").value
+	fructose = system.tag.read("Production/Paragon/Process/fructoseAccum").value
+	database = "Process"
+	system.db.runPrepUpdate("INSERT INTO tanks_data (process_id, tank_id, recipe_id, sucrose, fructose, water) VALUES (?, ?, ?, ?, ?, ?)", [process_id, tank, recipe_id, sucrose, fructose, water], database)
+	logger.infof("[Paragon] save_final_data_running_recipe() [do]: recipeId: %s, recipeName: %s, processId: %d", recipe_id, recipe_name, process_id)
 	time.sleep(3)
 	system.tag.write("Production/Paragon/Process/clear", True)
 	logger.info("[Paragon] save_final_data_running_recipe() [end]")
