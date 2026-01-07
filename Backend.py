@@ -741,13 +741,13 @@ def main(prebatch_path):
 	if started_tag.quality.isGood():
 		started = started_tag.value
 		if started:
+			# The process was started, which means all the requirements were met. If there's no process Id, assign a new one.
 			process_id = system.tag.read(prebatch_path + "Process/processId").value
 			if process_id != 0:
 				concentrate_transferred = system.tag.read(prebatch_path + "Process/concentrateTransferred").value
 				if not concentrate_transferred:
 					coordinate(prebatch_path)
 			else:
-				calculate(prebatch_path)
 				save_process_data(prebatch_path)
 		else:
 			loaded = system.tag.read(prebatch_path + "Process/loaded").value
