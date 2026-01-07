@@ -492,7 +492,6 @@ def set_unit_limit(prebatch_path, tank_path):
 		system.tag.write(prebatch_path + "Process/userUnits.EngLow", min_units)
 		system.tag.write(prebatch_path + "Process/userUnits.EngHigh", max_units)
 		system.tag.write(prebatch_path + "Process/userUnits", min_units)
-		system.tag.write(prebatch_path + "Process/unitLimitSet", True)
 	except:
 		logger.errorf("[%s] set_unit_limit() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
@@ -738,8 +737,17 @@ def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", False)
 	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
 	system.tag.writeBlocking(prebatch_path + "Process/loaded", False)
+	system.tag.writeBlocking(prebatch_path + "Process/processing", False)
+	system.tag.writeBlocking(prebatch_path + "Process/processId", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/calculatedUnits", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/userUnits", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/currentPosition", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/maxPosition", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/userName", "-")
 
 def main(prebatch_path):
+	# TODO: start with the evaluation of the Exception Found flag (not yet included in the tag database).
+	#  The Reset Alarms button in the HMI should reset this flag.
 	# The base point of the evaluation is the started tag and its quality.
 	started_tag = system.tag.read(prebatch_path + "Process/started")
 	# First, check the PLC is online.
@@ -758,9 +766,10 @@ def main(prebatch_path):
 			# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
 			loaded = system.tag.read(prebatch_path + "Process/loaded").value
 			if loaded:
-				# TODO: check for differences between userUnits and calculatedUnits; the Base Execution Plan must be confirmed too.
+				# TODO: check for differences between the User Units and the Calculated Units; the Base Execution Plan must be confirmed too.
 				#  This should trigger a call to calculate().
 				# The Loaded flag should also disable the buttons for recipe and tank selection.
+				# If the user needs to change the recipe or tank, the process should be reset.
 				clear_all_execution_plans(prebatch_path)
 			else:
 				clear_all_execution_plans(prebatch_path)
