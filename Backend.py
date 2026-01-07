@@ -734,6 +734,11 @@ def coordinate(prebatch_path):
 	if current_position > max_position:
 		system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", True)
 
+def initialize_flags(prebatch_path):
+	system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", False)
+	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
+	system.tag.writeBlocking(prebatch_path + "Process/loaded", False)
+
 def main(prebatch_path):
 	# The base point of the evaluation is the started tag and its quality.
 	started_tag = system.tag.read(prebatch_path + "Process/started")
@@ -741,7 +746,7 @@ def main(prebatch_path):
 	if started_tag.quality.isGood():
 		started = started_tag.value
 		if started:
-			# The process was started, which means all the requirements were met. If there's no process Id, assign a new one.
+			# The process was started, which means all the requirements were met. If there's no process id, assign a new one.
 			process_id = system.tag.read(prebatch_path + "Process/processId").value
 			if process_id != 0:
 				concentrate_transferred = system.tag.read(prebatch_path + "Process/concentrateTransferred").value
@@ -750,8 +755,20 @@ def main(prebatch_path):
 			else:
 				save_process_data(prebatch_path)
 		else:
+			# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
 			loaded = system.tag.read(prebatch_path + "Process/loaded").value
 			if loaded:
+				# TODO: check for differences between userUnits and calculatedUnits; the Base Execution Plan must be confirmed too.
+				#  This should trigger a call to calculate().
+				# The Loaded flag should also disable the buttons for recipe and tank selection.
+				clear_all_execution_plans(prebatch_path)
+			else:
+				clear_all_execution_plans(prebatch_path)
+				clear_all_recipes(prebatch_path)
+			# The Finalize flag comes from a button in the HMI, indicating that the process was ended successfully.
+			finalized = system.tag.read(prebatch_path + "Process/finalize").value
+			if finalized:
+				initialize_flags(prebatch_path)
 				clear_all_execution_plans(prebatch_path)
 				clear_all_recipes(prebatch_path)
 
