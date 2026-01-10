@@ -232,7 +232,8 @@ def load_recipe(prebatch_path, recipe_id):
 					system.tag.writeBlocking(component_path + "heatingSetpoint", component_data_row["heating_setpoint"])
 					system.tag.writeBlocking(component_path + "noInventoryValidation", component_data_row["no_inventory_validation"])
 				component_table = None
-		recipe_table= None
+		recipe_table = None
+		system.tag.writeBlocking(prebatch_path + "/Process/loaded", True)
 	except:
 		logger.errorf("[%s] load_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
@@ -489,9 +490,9 @@ def set_unit_limit(prebatch_path, tank_path):
 		if min_units < 1:
 			min_units = 1
 		logger.infof("[%s] set_unit_limit() [do]: min_units: %d, volume: %.2f L", prebatch_name, min_units, recipe_volume * min_units)
-		system.tag.write(prebatch_path + "Process/userUnits.EngLow", min_units)
-		system.tag.write(prebatch_path + "Process/userUnits.EngHigh", max_units)
-		system.tag.write(prebatch_path + "Process/userUnits", min_units)
+		system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngLow", min_units)
+		system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngHigh", max_units)
+		system.tag.writeBlocking(prebatch_path + "Process/userUnits", min_units)
 	except:
 		logger.errorf("[%s] set_unit_limit() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
@@ -575,6 +576,8 @@ def calculate(prebatch_path, tank_path, units):
 					logger.infof("[%s] calculate() [do]: unit %s found for %s; cycles = %d", prebatch_name, process_unit, components, int(cycles))
 				copy_position(current_base_position_path, current_production_position_path, cycles)
 				system.tag.writeBlocking(prebatch_path + "maxPosition", i)
+		# Set the Calculated Units.
+		system.tag.writeBlocking(prebatch_path + "Process/calculatedUnits", units)
 	except:
 		logger.errorf("[%s] calculate() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
@@ -746,54 +749,60 @@ def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/userName", "-")
 
 def main(prebatch_path):
-	# TODO: start with the evaluation of the Exception Found flag (not yet included in the tag database).
-	#  The Reset Alarms button in the HMI should reset this flag.
-	# The base point of the evaluation is the started tag and its quality.
-	started_tag = system.tag.read(prebatch_path + "Process/started")
-	# First, check the PLC is online.
-	if started_tag.quality.isGood():
-		started = started_tag.value
-		if started:
-			# The process was started, which means all the requirements were met. If there's no process id, assign a new one.
-			process_id = system.tag.read(prebatch_path + "Process/processId").value
-			if process_id != 0:
-				concentrate_transferred = system.tag.read(prebatch_path + "Process/concentrateTransferred").value
-				if not concentrate_transferred:
-					coordinate(prebatch_path)
+	# The Reset Alarms button in the HMI should reset the Alarmed flag.
+	system_alarmed = system.tag.read(prebatch_path + "Process/alarmed").value
+	if system_alarmed:
+		# The base point of the evaluation is the Started tag and its quality.
+		started_tag = system.tag.read(prebatch_path + "Process/started")
+		# First, check the PLC is online.
+		if started_tag.quality.isGood():
+			started = started_tag.value
+			if started:
+				# The process was started, which means all the requirements were met. If there's no process id, assign a new one.
+				# Otherwise, keep coordinating the sequences.
+				process_id = system.tag.read(prebatch_path + "Process/processId").value
+				if process_id != 0:
+					concentrate_transferred = system.tag.read(prebatch_path + "Process/concentrateTransferred").value
+					if not concentrate_transferred:
+						coordinate(prebatch_path)
+				else:
+					save_process_data(prebatch_path)
 			else:
-				save_process_data(prebatch_path)
-		else:
-			# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
-			loaded = system.tag.read(prebatch_path + "Process/loaded").value
-			if loaded:
-				# TODO: check for differences between the User Units and the Calculated Units; the Base Execution Plan must be confirmed too.
-				#  This should trigger a call to calculate().
-				# The Loaded flag should also disable the buttons for recipe and tank selection.
-				# If the user needs to change the recipe or tank, the process should be reset.
-				clear_all_execution_plans(prebatch_path)
-			else:
-				clear_all_execution_plans(prebatch_path)
-				clear_all_recipes(prebatch_path)
+				# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
+				loaded = system.tag.read(prebatch_path + "Process/loaded").value
+				tank = system.tag.read(prebatch_path + "Process/tank").value
+				tank_path = "[default]Production/SyrupRoom/Tanks/FinishedSyrup/T" + ("%02d" % tank) + "/"
+				if loaded:
+					# The Loaded flag should disable the buttons for recipe and tank selection.
+					# If the user needs to change the recipe or tank, the process must be reset.
+					calculated_units = system.tag.read(prebatch_path + "Process/calculatedUnits").value
+					user_units = system.tag.read(prebatch_path + "Process/userUnits").value
+					if calculated_units != user_units:
+						calculate(prebatch_path, tank_path, user_units)
+				else:
+					recipe_id = system.tag.read(prebatch_path + "Process/recipe/recipeId").value
+					if recipe_id != "" and tank > 0:
+						load_recipe(prebatch_path, recipe_id)
+						set_base_execution_plan(prebatch_path)
+						set_unit_limit(prebatch_path, tank_path)
+						min_units = system.tag.read(prebatch_path + "Process/userUnits.EngLow")
+						calculate(prebatch_path, tank_path, min_units)
 			# The Finalize flag comes from a button in the HMI, indicating that the process was ended successfully.
+			# Also, there must be an option for process reset (another button in the HMI).
 			finalized = system.tag.read(prebatch_path + "Process/finalize").value
-			if finalized:
+			reset = system.tag.read(prebatch_path + "Process/reset").value
+			if finalized or reset:
 				initialize_flags(prebatch_path)
 				clear_all_execution_plans(prebatch_path)
 				clear_all_recipes(prebatch_path)
 
-
-def module_available(position):
-	logger = system.util.getLogger(LOGGER_NAME)
-	logger.infof("[Paragon] module_available(position: %d) [start]", position)
-	process_unit = system.tag.read("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/processUnit").value	
+def module_available(prebatch_path, transfer_position):
+	units_path = prebatch_path + "Units/"
+	units = system.tag.browse(path=units_path, recursive=False)
 	result = True
-	# Tank T01.
-	if (process_unit == "T01"):
-		logger.infof("[Paragon] module_available(position: %d) [do]: current position in T-01: %d (%s)", position, system.tag.read("Production/Paragon/Tanks/T01/executionPosition/cition").value, system.tag.read("Production/Paragon/Tanks/T01/executionPosition/components").value)
-		if (system.tag.read("Production/Paragon/Tanks/T01/executionPosition/cition").value != 0):
+	for unit in units:
+		if system.tag.read(str(unit["fullPath"]) + "/positionObject/transferPosition").value == transfer_position:
 			result = False
-	logger.infof("[Paragon] module_available(position: %d) [do]: unit: %s, result: %s", position, process_unit, result)
-	logger.infof("[Paragon] module_available(position: %d) [end]", position)
 	return result
 
 def initialize_module(position):
@@ -874,7 +883,7 @@ def skip_current_component():
 
 def cancel_running_recipe():
 	logger = system.util.getLogger(LOGGER_NAME)
-	logger.info("[Paragon] cancel_running_recipe() [start]")	
+	logger.info("[Paragon] cancel_running_recipe() [start]")
 	system.db.runPrepUpdate("INSERT INTO pb_recipes_canceled (process_id) VALUES (?)", [process_id], database)
 	save_final_data_running_recipe()
 	logger.info("[Paragon] cancel_running_recipe() [end]")
