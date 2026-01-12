@@ -26,8 +26,6 @@ def machine_conditions_ready(prebatch_path):
 	# TODO: add external batch management conditions (Prebatch and Tank allocated, as well as the concentrate dosing phases active).
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
-		logger.infof("[%s] machine_conditions_ready() [start]", prebatch_name)
 	# The main condition is there should be only one default unit, assigned to a common tank.
 	only_one_default_unit = False
 	default_unit_is_common = False
@@ -49,8 +47,6 @@ def machine_conditions_ready(prebatch_path):
 		logger.errorf("[%s] machine_conditions_ready() [error]: the default unit must have the 'common' capability", prebatch_name)
 	if not default_unit_is_common or not only_one_default_unit:
 		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
-	if LOG_INFO_EVENTS:
-		logger.infof("[%s] machine_conditions_ready() [end]: %b", prebatch_name, default_unit_is_common and only_one_default_unit)
 	logger = None
 	return default_unit_is_common and only_one_default_unit
 
@@ -742,52 +738,51 @@ def main(prebatch_path):
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
 	system_alarmed = system.tag.read(prebatch_path + "Process/alarmed").value
 	# Verify there's a correct configuration in the system.
-	if not system_alarmed and machine_conditions_ready(prebatch_path):
-		# The base point of the evaluation is the Started tag and its quality.
-		started_tag = system.tag.read(prebatch_path + "Process/started")
-		# First, check the PLC is online.
-		if started_tag.quality.isGood:
-			started = started_tag.value
-			if started:
-				# The process was started, which means all the requirements were met. If there's no process id, assign a new one.
-				# Otherwise, keep coordinating the sequences.
-				process_id = system.tag.read(prebatch_path + "Process/processId").value
-				if process_id != 0:
-					concentrate_transferred = system.tag.read(prebatch_path + "Process/concentrateTransferred").value
-					if not concentrate_transferred:
-						coordinate(prebatch_path)
+	if not system_alarmed:
+		if machine_conditions_ready(prebatch_path):
+			# The base point of the evaluation is the Started tag and its quality.
+			started_tag = system.tag.read(prebatch_path + "Process/started")
+			# First, check the PLC is online.
+			if started_tag.quality.isGood:
+				started = started_tag.value
+				if started:
+					# The process was started, which means all the requirements were met. If there's no process id, assign a new one.
+					# Otherwise, keep coordinating the sequences.
+					process_id = system.tag.read(prebatch_path + "Process/processId").value
+					if process_id != 0:
+						concentrate_transferred = system.tag.read(prebatch_path + "Process/concentrateTransferred").value
+						if not concentrate_transferred:
+							coordinate(prebatch_path)
+					else:
+						save_process_data(prebatch_path)
 				else:
-					save_process_data(prebatch_path)
-			else:
-				# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
-				loaded = system.tag.read(prebatch_path + "Process/loaded").value
-				tank = system.tag.read(prebatch_path + "Process/tank").value
-				tank_path = "[default]Production/SyrupRoom/Tanks/FinishedSyrup/T" + ("%02d" % tank) + "/"
-				if loaded:
-					# The Loaded flag should disable the buttons for recipe and tank selection.
-					# If the user needs to change the recipe or tank, the process must be reset.
-					calculated_units = system.tag.read(prebatch_path + "Process/calculatedUnits").value
-					user_units = system.tag.read(prebatch_path + "Process/userUnits").value
-					if calculated_units != user_units:
-						calculate(prebatch_path, tank_path, user_units)
-				else:
-					recipe_id = system.tag.read(prebatch_path + "Process/baseRecipe/recipeId").value
-					if recipe_id is not None:
-						# Wait until there's the right selection of the recipe and finished syrup tank.
-						if recipe_id != "" and tank > 0:
-							load_recipe(prebatch_path, recipe_id)
-							set_base_execution_plan(prebatch_path)
-							set_unit_limit(prebatch_path, tank_path)
-							min_units = system.tag.read(prebatch_path + "Process/userUnits.EngLow")
-							calculate(prebatch_path, tank_path, min_units)
-			# The Finalize flag comes from a button in the HMI, indicating that the process was ended successfully.
-			# Also, there must be an option for process reset (another button in the HMI).
-			finalized = system.tag.read(prebatch_path + "Process/finalize").value
-			reset = system.tag.read(prebatch_path + "Process/reset").value
-			if finalized or reset:
-				initialize_flags(prebatch_path)
-				clear_all_execution_plans(prebatch_path)
-				clear_all_recipes(prebatch_path)
+					# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
+					loaded = system.tag.read(prebatch_path + "Process/loaded").value
+					tank = system.tag.read(prebatch_path + "Process/tank").value
+					tank_path = "[default]Production/SyrupRoom/Tanks/FinishedSyrup/T" + ("%02d" % tank) + "/"
+					if loaded:
+						# The Loaded flag should disable the buttons for recipe and tank selection.
+						# If the user needs to change the recipe or tank, the process must be reset.
+						calculated_units = system.tag.read(prebatch_path + "Process/calculatedUnits").value
+						user_units = system.tag.read(prebatch_path + "Process/userUnits").value
+						if calculated_units != user_units or calculated_units == 0:
+							calculate(prebatch_path, tank_path, user_units)
+					else:
+						recipe_id = system.tag.read(prebatch_path + "Process/baseRecipe/recipeId").value
+						if recipe_id is not None:
+							# Wait until there's the right selection of the recipe and finished syrup tank.
+							if recipe_id != "" and tank > 0:
+								load_recipe(prebatch_path, recipe_id)
+								set_base_execution_plan(prebatch_path)
+								set_unit_limit(prebatch_path, tank_path)
+				# The Finalize flag comes from a button in the HMI, indicating that the process was ended successfully.
+				# Also, there must be an option for process reset (another button in the HMI).
+				finalized = system.tag.read(prebatch_path + "Process/finalize").value
+				reset = system.tag.read(prebatch_path + "Process/reset").value
+				if finalized or reset:
+					initialize_flags(prebatch_path)
+					clear_all_execution_plans(prebatch_path)
+					clear_all_recipes(prebatch_path)
 
 def module_available(prebatch_path, transfer_position):
 	units_path = prebatch_path + "Units/"
