@@ -138,13 +138,15 @@ def clear_all_recipes(prebatch_path):
 	recipes = ["baseRecipe"]
 	for recipe in recipes:
 		recipe_path = prebatch_path + "Process/" + recipe + "/"
-		logger.infof("[%s] clear_all_recipes() [do]: target: %s", prebatch_name, recipe_path)
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] clear_all_recipes() [do]: target: %s", prebatch_name, recipe_path)
 		clear_full_recipe(recipe_path, prebatch_name)
 	# Production (partial) recipes.
 	recipes = ["productionRecipe"]
 	for recipe in recipes:
 		recipe_path = prebatch_path + "Process/" + recipe + "/"
-		logger.infof("[%s] clear_all_recipes() [do]: target: %s", prebatch_name, recipe_path)
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] clear_all_recipes() [do]: target: %s", prebatch_name, recipe_path)
 		clear_production_recipe(recipe_path, prebatch_name)
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] clear_all_recipes() [end]", prebatch_name)
@@ -249,7 +251,8 @@ def clear_all_execution_plans(prebatch_path):
 		logger.infof("[%s] clear_execution_plans() [start]", prebatch_name)
 	for execution_plan in executions_plans:
 		execution_plan_path = prebatch_path + "Process/" + execution_plan + "/"
-		logger.infof("[%s] clear_execution_plans() [do]: target: %s", prebatch_name, execution_plan_path)
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] clear_execution_plans() [do]: target: %s", prebatch_name, execution_plan_path)
 		for i in range (1, POSITION_SLOTS + 1):
 			clear_execution_position(execution_plan_path + "/Positions/p" + str("%02d" % i) + "/")
 	if LOG_INFO_EVENTS:
