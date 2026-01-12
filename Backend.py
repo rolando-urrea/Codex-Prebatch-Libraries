@@ -21,29 +21,13 @@ SWEETENER_DENSITY = 1.30
 SIMPLE_SYRUP_BRIX = 0.60
 FRUCTOSE_SOLIDS = 0.77
 
-def mark_process_start(prebatch_name, tank_name):
-	# This function is used just to mark the start of the process, determined when a tank is selected.
-	if LOG_INFO_EVENTS:
-		logger = system.util.getLogger(LOGGER_NAME)
-		logger.infof("[%s] *** Process START ***", prebatch_name)
-		logger.infof("[%s] Target tank: %s", prebatch_name, tank_name)
-		logger = None
-
-def mark_process_end(prebatch_name):
-	# This function is used just to mark the end of the process.
-	if LOG_INFO_EVENTS:
-		logger = system.util.getLogger(LOGGER_NAME)
-		logger.infof("[%s] *** Process END ***", prebatch_name)
-		logger = None
-
 def machine_conditions_ready(prebatch_path):
 	# Checks if all the start base conditions are met.
 	# TODO: add external batch management conditions (Prebatch and Tank allocated, as well as the concentrate dosing phases active).
-	# TODO: create a memory tag to indicate there's a problem with the machine conditions; this should prevent the logger from creating constant entries if the error persists.
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
-		logger.infof("[%s] start_conditions_ready() [start]", prebatch_name)
+		logger.infof("[%s] machine_conditions_ready() [start]", prebatch_name)
 	# The main condition is there should be only one default unit, assigned to a common tank.
 	only_one_default_unit = False
 	default_unit_is_common = False
@@ -59,12 +43,14 @@ def machine_conditions_ready(prebatch_path):
 		only_one_default_unit = True
 	# Inform there should be only one default unit.
 	if default_unit_count != 1:
-		logger.errorf("[%s] start_conditions_ready() [error]: there should be only one default unit", prebatch_name)
+		logger.errorf("[%s] machine_conditions_ready() [error]: there should be only one default unit", prebatch_name)
 	# The default unit must be of the common type.
 	if not default_unit_is_common:
-		logger.errorf("[%s] start_conditions_ready() [error]: the default unit must have the 'common' capability", prebatch_name)
+		logger.errorf("[%s] machine_conditions_ready() [error]: the default unit must have the 'common' capability", prebatch_name)
+	if not default_unit_is_common or not only_one_default_unit:
+		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
 	if LOG_INFO_EVENTS:
-		logger.infof("[%s] start_conditions_ready() [end]: %b", prebatch_name, default_unit_is_common and only_one_default_unit)
+		logger.infof("[%s] machine_conditions_ready() [end]: %b", prebatch_name, default_unit_is_common and only_one_default_unit)
 	logger = None
 	return default_unit_is_common and only_one_default_unit
 
@@ -106,7 +92,7 @@ def clear_full_recipe(recipe_path, prebatch_name):
 		logger.infof("[%s] clear_full_recipe() [start]", prebatch_name)
 	try:
 		# Initialize all the recipe's fields.
-		system.tag.writeBlocking(recipe_path + "recipeId", "-")
+		system.tag.writeBlocking(recipe_path + "recipeId", "")
 		system.tag.writeBlocking(recipe_path + "recipeName", "")
 		system.tag.writeBlocking(recipe_path + "recipeType", 0)
 		system.tag.writeBlocking(recipe_path + "recipeVersion", 0)
@@ -741,21 +727,26 @@ def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
 	system.tag.writeBlocking(prebatch_path + "Process/loaded", False)
 	system.tag.writeBlocking(prebatch_path + "Process/processing", False)
+	system.tag.writeBlocking(prebatch_path + "Process/reset", False)
 	system.tag.writeBlocking(prebatch_path + "Process/processId", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/calculatedUnits", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngLow", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngHigh", 100)
 	system.tag.writeBlocking(prebatch_path + "Process/userUnits", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/currentPosition", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/maxPosition", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/tankAgitationWater", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/userName", "-")
 
 def main(prebatch_path):
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
 	system_alarmed = system.tag.read(prebatch_path + "Process/alarmed").value
-	if system_alarmed:
+	# Verify there's a correct configuration in the system.
+	if not system_alarmed and machine_conditions_ready(prebatch_path):
 		# The base point of the evaluation is the Started tag and its quality.
 		started_tag = system.tag.read(prebatch_path + "Process/started")
 		# First, check the PLC is online.
-		if started_tag.quality.isGood():
+		if started_tag.quality.isGood:
 			started = started_tag.value
 			if started:
 				# The process was started, which means all the requirements were met. If there's no process id, assign a new one.
@@ -780,13 +771,15 @@ def main(prebatch_path):
 					if calculated_units != user_units:
 						calculate(prebatch_path, tank_path, user_units)
 				else:
-					recipe_id = system.tag.read(prebatch_path + "Process/recipe/recipeId").value
-					if recipe_id != "" and tank > 0:
-						load_recipe(prebatch_path, recipe_id)
-						set_base_execution_plan(prebatch_path)
-						set_unit_limit(prebatch_path, tank_path)
-						min_units = system.tag.read(prebatch_path + "Process/userUnits.EngLow")
-						calculate(prebatch_path, tank_path, min_units)
+					recipe_id = system.tag.read(prebatch_path + "Process/baseRecipe/recipeId").value
+					if recipe_id is not None:
+						# Wait until there's the right selection of the recipe and finished syrup tank.
+						if recipe_id != "" and tank > 0:
+							load_recipe(prebatch_path, recipe_id)
+							set_base_execution_plan(prebatch_path)
+							set_unit_limit(prebatch_path, tank_path)
+							min_units = system.tag.read(prebatch_path + "Process/userUnits.EngLow")
+							calculate(prebatch_path, tank_path, min_units)
 			# The Finalize flag comes from a button in the HMI, indicating that the process was ended successfully.
 			# Also, there must be an option for process reset (another button in the HMI).
 			finalized = system.tag.read(prebatch_path + "Process/finalize").value
