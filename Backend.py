@@ -737,6 +737,15 @@ def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/tankAgitationWater", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/userName", "-")
 
+def module_available(prebatch_path, transfer_position):
+	units_path = prebatch_path + "Units/"
+	units = system.tag.browse(path=units_path, recursive=False)
+	result = True
+	for unit in units:
+		if system.tag.read(str(unit["fullPath"]) + "/positionObject/transferPosition").value == transfer_position:
+			result = False
+	return result
+
 def check_inventory_completion(prebatch_path):
 	logger = system.util.getLogger(LOGGER_NAME)
 	try:
@@ -790,7 +799,7 @@ def check_inventory_completion(prebatch_path):
 	finally:
 		logger = None
 
-def store_inventory(prebatch_path):
+def save_inventory(prebatch_path):
 	logger = system.util.getLogger(LOGGER_NAME)
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	prebatch_number = system.tag.read(prebatch_path + "Process/prebatchNumber").value
@@ -924,20 +933,13 @@ def main(prebatch_path):
 					if aborted:
 						cancel_running_recipe(prebatch_path)
 					if aborted or finalized:
+						if BARCODE_EVALUATION:
+							save_inventory(prebatch_path)
 						save_final_data_running_recipe(prebatch_path)
 					initialize_flags(prebatch_path)
 					clear_all_execution_plans(prebatch_path)
 					clear_all_recipes(prebatch_path)
 					system.tag.writeBlocking(prebatch_path + "Process/processing", False)
-
-def module_available(prebatch_path, transfer_position):
-	units_path = prebatch_path + "Units/"
-	units = system.tag.browse(path=units_path, recursive=False)
-	result = True
-	for unit in units:
-		if system.tag.read(str(unit["fullPath"]) + "/positionObject/transferPosition").value == transfer_position:
-			result = False
-	return result
 
 def initialize_module(position):
 	logger = system.util.getLogger(LOGGER_NAME)
