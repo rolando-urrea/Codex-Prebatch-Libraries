@@ -567,7 +567,7 @@ def calculate(prebatch_path, tank_path, units):
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] calculate() [end]", prebatch_name)
-		del logger
+		logger = None
 
 def save_process_data(prebatch_path):
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
@@ -619,7 +619,7 @@ def save_process_data(prebatch_path):
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] save_process_data() [do]: recipe_id: %s, recipe_name: %s, process_id: %d", prebatch_name, recipe_id, recipe_name, process_id)
 			logger.infof("[%s] save_process_data() [end]", prebatch_name)
-		del logger
+		logger = None
 
 def step_stored(step, cycle, progress_table):
 	result = False
@@ -895,6 +895,7 @@ def main(prebatch_path):
 					else:
 						system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 						save_process_data(prebatch_path)
+						# TODO: transfer the Production Execution Plan to the OPC one; also the Production Recipe to the OPC Recipe (create the object).
 						system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 				else:
 					# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
