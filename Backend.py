@@ -16,6 +16,7 @@ DATABASE = "Process"
 # Process setup.
 POSITION_SLOTS = 16
 PROCESSOR_MANAGED = True
+BARCODE_EVALUATION = True
 # Estimation for volume evaluation.
 SWEETENER_DENSITY = 1.30
 SIMPLE_SYRUP_BRIX = 0.60
@@ -737,6 +738,53 @@ def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/tankAgitationWater", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/userName", "-")
 
+def check_inventory_completion(prebatch_path):
+	# Check if barcode validation is active.
+	if system.tag.read(prebatch_path + "Process/Inventory/skip").value:
+		system.tag.writeBlocking(prebatch_path + "Process/Inventory/correct", True)
+	else:
+		current_correct_flag = system.tag.read(prebatch_path + "Process/Inventory/correct").value
+		result = False
+		if not system.tag.read(prebatch_path + "Process/Inventory/wrongCodesExist").value:
+			result = True
+			required_units = system.tag.read(prebatch_path + "/Process/calculatedUnits").value
+			prebatch_number = system.tag.read(prebatch_path + "/Process/prebatchNumber").value
+			table = system.db.runPrepQuery("SELECT * FROM pb_inventory_capture_detailed WHERE prebatch = ?", [prebatch_number], DATABASE)
+			if len(table) > 0:
+				tag_path = prebatch_path + "Process/baseRecipe/Components/"
+				# Component slot loop.
+				for i in range(1, POSITION_SLOTS + 1):
+					# Each required concentrate has to be checked in the capture table.
+					# The loop has to compare its existence and the unit amount.
+					# Since there can be different component presentations in the same production recipe, accumulation has to be performed.
+					concentrate_found = False
+					current_recipe_component = system.tag.read(tag_path + "c" + ("%02d" % i) + "/componentId").value
+					requires_inventory_validation = not system.tag.read(tag_path + "c" + ("%02d" % i) + "/noInventoryValidation").value
+					if (current_recipe_component != "") and requires_inventory_validation:
+						component_units = 0
+						for row_index in range(len(table)):
+							# Field loop.
+							for j in range(1, 6):
+								current_package_component_id = table[row_index]["c" + ("%02d" % j) + "_id"]
+								if current_package_component_id == current_recipe_component:
+									component_units += table[row_index]["units_total"]
+						if required_units == component_units:
+							concentrate_found = True
+					else:
+						concentrate_found = True
+					if not concentrate_found:
+						result = False
+			else:
+				result = False
+			# Don't wait for the garbage collector to release the table's used memory.
+			table = None
+		system.tag.write("Production/Paragon/Process/Inventory/correct", result)
+		# Send a message to the logger only if there's a change in the correct flag.
+		if current_correct_flag != result:
+			logger = system.util.getLogger(LOGGER_NAME)
+			logger.infof("[Paragon] check_inventory_completion() [do]: correct: %s", result)
+			del logger
+
 def main(prebatch_path):
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
 	system_alarmed = system.tag.read(prebatch_path + "Process/alarmed").value
@@ -770,6 +818,9 @@ def main(prebatch_path):
 						user_units = system.tag.read(prebatch_path + "Process/userUnits").value
 						if calculated_units != user_units or calculated_units == 0:
 							calculate(prebatch_path, tank_path, user_units)
+						# Evaluate inventory completion (if it's available).
+						if BARCODE_EVALUATION:
+							check_inventory_completion(prebatch_path)
 					else:
 						recipe_id = system.tag.read(prebatch_path + "Process/baseRecipe/recipeId").value
 						if recipe_id is not None:
@@ -898,53 +949,6 @@ def save_final_data_running_recipe():
 	system.tag.write("Production/Paragon/Process/clear", True)
 	logger.info("[Paragon] save_final_data_running_recipe() [end]")
 	del logger
-
-def check_inventory_completion():
-	# Check if barcode validation is active.
-	if (system.tag.read("Production/Paragon/Process/Inventory/skip").value):
-		system.tag.write("Production/Paragon/Process/Inventory/correct", False)
-	else:
-		current_correct_flag = system.tag.read("Production/Paragon/Process/Inventory/correct").value
-		result = False
-		if not(system.tag.read("Production/Paragon/Process/Inventory/wrongCodesExist").value):
-			result = True
-			required_units = system.tag.read("Production/Paragon/Process/units").value
-			database = "Process"
-			table = system.db.runPrepQuery("SELECT * FROM pb_inventory_capture_detailed WHERE prebatch = 1", [], database)
-			if len(table) > 0:
-				tag_path = "Production/Paragon/Process/recipe/Components/"
-				# Component slot loop.
-				for i in range(16):
-					# Each required concentrate has to be checked in the capture table.
-					# The loop has to compare its existence and the unit amount.
-					# Since there can be different component presentations in the same production recipe, accumulation has to be performed.
-					concentrate_found = False
-					current_recipe_component = system.tag.read(tag_path + "c" + ("%02d" % (i + 1)) + "/id").value
-					requires_inventory_validation = not(system.tag.read(tag_path + "c" + ("%02d" % (i + 1)) + "/noInventoryValidation").value)
-					if ((current_recipe_component != "-") and requires_inventory_validation):
-						component_units = 0
-						for row_index in range(len(table)):
-							# Field loop.
-							for j in range(5):
-								current_package_component_id = table[row_index]["c" + ("%02d" % (j + 1)) + "_id"]
-								if (current_package_component_id == current_recipe_component):
-									component_units += table[row_index]["units_total"]
-						if (required_units == component_units):
-							concentrate_found = True
-					else:
-						concentrate_found = True
-					if not(concentrate_found):
-						result = False
-			else:
-				result = False
-			# Don"t wait for the garbage collector to release the table"s used memory.
-			del table	
-		system.tag.write("Production/Paragon/Process/Inventory/correct", result)
-		# Send to the logger only if there"s a change in the correct flag.
-		if (current_correct_flag != result):
-			logger = system.util.getLogger(LOGGER_NAME)
-			logger.infof("[Paragon] check_inventory_completion() [do]: correct: %s", result)	
-			del logger
 
 def store_inventory():
 	logger = system.util.getLogger(LOGGER_NAME)
