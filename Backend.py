@@ -721,6 +721,7 @@ def coordinate(prebatch_path):
 		system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", True)
 
 def initialize_flags(prebatch_path):
+	system.tag.writeBlocking(prebatch_path + "Process/abort", False)
 	system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", False)
 	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
 	system.tag.writeBlocking(prebatch_path + "Process/loaded", False)
@@ -825,6 +826,44 @@ def store_inventory(prebatch_path):
 			logger.infof("[%s] store_inventory() [end]", prebatch_name)
 		logger = None
 
+def cancel_running_recipe(prebatch_path):
+	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
+	process_id = system.tag.read(prebatch_path + "Process/processId").value
+	logger = system.util.getLogger(LOGGER_NAME)
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] cancel_running_recipe() [start]", prebatch_name)
+	try:
+		system.db.runPrepUpdate("INSERT INTO pb_recipes_canceled (process_id) VALUES (?)", [process_id], DATABASE)
+	except:
+		logger.errorf("[%s] cancel_running_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] cancel_running_recipe() [end]", prebatch_name)
+		logger = None
+
+def save_final_data_running_recipe(prebatch_path):
+	logger = system.util.getLogger(LOGGER_NAME)
+	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
+	if LOG_INFO_EVENTS:
+		logger.infoF("[%S] save_final_data_running_recipe() [start]", prebatch_name)
+	try:
+		process_id = system.tag.read(prebatch_path + "Process/processId").value
+		tank = system.tag.read(prebatch_path + "Process/tank").value
+		tank_accum_path = "[default]Production/SyrupRoom/Tanks/FinishedSyrup/T" + ("%02d" % tank) + "/Accum/"
+		recipe_id = system.tag.read(prebatch_path + "Process/baseRecipe/recipeId").value
+		recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
+		water = system.tag.read(tank_accum_path + "water").value
+		sucrose = system.tag.read(tank_accum_path + "sucrose").value
+		fructose = system.tag.read(tank_accum_path + "fructose").value
+		system.db.runPrepUpdate("INSERT INTO tanks_data (process_id, tank_id, recipe_id, sucrose, fructose, water) VALUES (?, ?, ?, ?, ?, ?)", [process_id, tank, recipe_id, sucrose, fructose, water], DATABASE)
+		logger.infof("[%s] save_final_data_running_recipe() [do]: recipeId: %s, recipeName: %s, processId: %d", prebatch_name, recipe_id, recipe_name, process_id)
+	except:
+		logger.errorf("[%s] save_final_data_running_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] save_final_data_running_recipe() [end]", prebatch_name)
+		logger = None
+
 def main(prebatch_path):
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
 	system_alarmed = system.tag.read(prebatch_path + "Process/alarmed").value
@@ -845,7 +884,9 @@ def main(prebatch_path):
 						if not concentrate_transferred:
 							coordinate(prebatch_path)
 					else:
+						system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 						save_process_data(prebatch_path)
+						system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 				else:
 					# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
 					loaded = system.tag.read(prebatch_path + "Process/loaded").value
@@ -857,7 +898,9 @@ def main(prebatch_path):
 						calculated_units = system.tag.read(prebatch_path + "Process/calculatedUnits").value
 						user_units = system.tag.read(prebatch_path + "Process/userUnits").value
 						if calculated_units != user_units or calculated_units == 0:
+							system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 							calculate(prebatch_path, tank_path, user_units)
+							system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 						# Evaluate inventory completion (if it's available).
 						if BARCODE_EVALUATION:
 							check_inventory_completion(prebatch_path)
@@ -866,17 +909,26 @@ def main(prebatch_path):
 						if recipe_id is not None:
 							# Wait until there's the right selection of the recipe and finished syrup tank.
 							if recipe_id != "" and tank > 0:
+								system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 								load_recipe(prebatch_path, recipe_id)
 								set_base_execution_plan(prebatch_path)
 								set_unit_limit(prebatch_path, tank_path)
+								system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 				# The Finalize flag comes from a button in the HMI, indicating that the process was ended successfully.
-				# Also, there must be an option for process reset (another button in the HMI).
+				# Also, there must be an option for process reset and abort (another set of buttons in the HMI).
+				aborted = system.tag.read(prebatch_path + "Process/abort").value
 				finalized = system.tag.read(prebatch_path + "Process/finalize").value
 				reset = system.tag.read(prebatch_path + "Process/reset").value
-				if finalized or reset:
+				if aborted or finalized or reset:
+					system.tag.writeBlocking(prebatch_path + "Process/processing", True)
+					if aborted:
+						cancel_running_recipe(prebatch_path)
+					if aborted or finalized:
+						save_final_data_running_recipe(prebatch_path)
 					initialize_flags(prebatch_path)
 					clear_all_execution_plans(prebatch_path)
 					clear_all_recipes(prebatch_path)
+					system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 
 def module_available(prebatch_path, transfer_position):
 	units_path = prebatch_path + "Units/"
@@ -962,33 +1014,3 @@ def skip_current_component():
 	system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, position, step, manual) VALUES (?, ?, ?, ?)", [process_id, current_position, 5, True], database)
 	logger.info("[Paragon] skip_current_component [end]")
 	del logger
-
-def cancel_running_recipe():
-	logger = system.util.getLogger(LOGGER_NAME)
-	logger.info("[Paragon] cancel_running_recipe() [start]")
-	system.db.runPrepUpdate("INSERT INTO pb_recipes_canceled (process_id) VALUES (?)", [process_id], database)
-	save_final_data_running_recipe()
-	logger.info("[Paragon] cancel_running_recipe() [end]")
-	del logger
-
-def save_final_data_running_recipe():
-	import time
-	logger = system.util.getLogger(LOGGER_NAME)
-	logger.info("[Paragon] save_final_data_running_recipe() [start]")
-	store_inventory()
-	tank = system.tag.read("Production/Paragon/Process/tank").value
-	recipe_id = system.tag.read("Production/Paragon/Process/recipe/id").value
-	recipe_name = system.tag.read("Production/Paragon/Process/recipe/name").value
-	water = system.tag.read("Production/Paragon/Process/waterAccum").value
-	sucrose = system.tag.read("Production/Paragon/Process/sucroseAccum").value
-	fructose = system.tag.read("Production/Paragon/Process/fructoseAccum").value
-	database = "Process"
-	system.db.runPrepUpdate("INSERT INTO tanks_data (process_id, tank_id, recipe_id, sucrose, fructose, water) VALUES (?, ?, ?, ?, ?, ?)", [process_id, tank, recipe_id, sucrose, fructose, water], database)
-	logger.infof("[Paragon] save_final_data_running_recipe() [do]: recipeId: %s, recipeName: %s, processId: %d", recipe_id, recipe_name, process_id)
-	time.sleep(3)
-	system.tag.write("Production/Paragon/Process/clear", True)
-	logger.info("[Paragon] save_final_data_running_recipe() [end]")
-	del logger
-
-if __name__ == '__main__':
-	mark_process_start("Prebatch 1", "Tanque 4")
