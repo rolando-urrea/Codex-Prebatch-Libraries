@@ -579,7 +579,6 @@ def save_process_data(prebatch_path):
 	recipe_name = ""
 	process_id = 0
 	try:
-		# TODO: remove the requirement of the RDBMS by implementing views directly in the database.
 		if RDBMS == "PostgreSQL":
 			last_stored_process_id = system.db.runScalarQuery("SELECT process_id FROM pb_recipes_executed ORDER BY process_id DESC LIMIT 1", DATABASE)
 		if RDBMS == "SQL Server":
@@ -790,6 +789,42 @@ def check_inventory_completion(prebatch_path):
 	finally:
 		logger = None
 
+def store_inventory(prebatch_path):
+	logger = system.util.getLogger(LOGGER_NAME)
+	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
+	prebatch_number = system.tag.read(prebatch_path + "Process/prebatchNumber").value
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] store_inventory() [start]", prebatch_name)
+	try:
+		# Transfers the records from the capture table to the history one.
+		process_id = system.tag.read(prebatch_path + "Process/processId").value
+		capture_table = system.db.runPrepQuery("SELECT * FROM pb_inventory_capture WHERE prebatch = ?", [prebatch_number], DATABASE)
+		tx_id = system.db.beginTransaction(DATABASE, timeout = 5000)
+		for row_index in range(len(capture_table)):
+			local_row = capture_table[row_index]
+			# Update history.
+			update_query = "INSERT INTO pb_inventory_history (process_id, capture_host, capture_user, presentation_id, presentation_batch, presentation_expiration, presentation_serial, update_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+			system.db.runPrepUpdate(update_query, [process_id, local_row["capture_host"], local_row["capture_user"], local_row["presentation_id"], local_row["presentation_batch"], local_row["presentation_expiration"], local_row["presentation_serial"], local_row["update_time"]], database, tx_id)
+			# Update warehouse data.
+			if RDBMS == "PostgreSQL":
+				update_query = "UPDATE pb_inventory_warehouse SET is_active = FALSE WHERE presentation_id = ? AND presentation_batch = ? AND presentation_serial = ?"
+			if RDBMS == "SQL Server":
+				update_query = "UPDATE pb_inventory_warehouse SET is_active = 0 WHERE presentation_id = ? AND presentation_batch = ? AND presentation_serial = ?"
+			system.db.runPrepUpdate(update_query, [local_row["presentation_id"], local_row["presentation_batch"], local_row["presentation_serial"]], DATABASE, tx_id)
+			update_query = "INSERT INTO pb_inventory_warehouse (presentation_id, presentation_batch, presentation_serial, presentation_expiration) VALUES (?, ?, ?, ?)"
+			system.db.runPrepUpdate(update_query, [local_row["presentation_id"], local_row["presentation_batch"], local_row["presentation_serial"], local_row["presentation_expiration"], "Salida por consumo"], DATABASE, tx_id)
+		system.db.commitTransaction(tx_id)
+		system.db.closeTransaction(tx_id)
+		# Don't wait for the garbage collector to release the table's used memory.
+		capture_table = None
+		system.db.runPrepUpdate("DELETE FROM pb_inventory_capture WHERE prebatch = 1", [], DATABASE)
+	except:
+		logger.errorf("[%s] store_inventory() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] store_inventory() [end]", prebatch_name)
+		logger = None
+
 def main(prebatch_path):
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
 	system_alarmed = system.tag.read(prebatch_path + "Process/alarmed").value
@@ -897,19 +932,19 @@ def process_component(position, in_transfer_position):
 	logger = system.util.getLogger(LOGGER_NAME)
 	logger.infof("[Paragon] process_component(position: %d, in_transfer_position: %s) [start]", position, in_transfer_position)
 	process_unit = system.tag.read("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/processUnit").value
-	# Tank T-01.
+	# Tank T-01.
 	if (process_unit == "T-01"):
 		# Copy the position if required.
 		if (system.tag.read("Production/Paragon/Tanks/T01/executionPosition/cition").value != position):
 			copy_position("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/", "Production/Paragon/Tanks/T01/executionPosition/", 1)
 		system.tag.writeSynchronous("Production/Paragon/Tanks/T01/inTransferPosition", in_transfer_position, 5000)
-	# Tank T-02.
+	# Tank T-02.
 	if (process_unit == "T-02"):
 		# Copy the position if required.
 		if (system.tag.read("Production/Paragon/Tanks/T02/executionPosition/cition").value != position):
 			copy_position("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/", "Production/Paragon/Tanks/T02/executionPosition/", 1)
 		system.tag.writeSynchronous("Production/Paragon/Tanks/T02/inTransferPosition", in_transfer_position, 5000)
-	# Bayonet.
+	# Bayonet.
 	if (process_unit == "B-01"):
 		# Copy the position if required.
 		if (system.tag.read("Production/Paragon/Tanks/B01/executionPosition/cition").value != position):
@@ -953,32 +988,6 @@ def save_final_data_running_recipe():
 	time.sleep(3)
 	system.tag.write("Production/Paragon/Process/clear", True)
 	logger.info("[Paragon] save_final_data_running_recipe() [end]")
-	del logger
-
-def store_inventory():
-	logger = system.util.getLogger(LOGGER_NAME)
-	logger.info("[Paragon] store_inventory() [start]")	
-	# Transfers the records from the capture table to the history one.
-	process_id = system.tag.read("Production/Paragon/Process/processId").value
-	database = "Process"
-	capture_table = system.db.runPrepQuery("SELECT * FROM pb_inventory_capture WHERE prebatch = 1", [], database)
-	tx_id = system.db.beginTransaction(database, timeout = 5000)
-	for row_index in range(len(capture_table)):
-		local_row = capture_table[row_index]
-		# Update history.
-		update_query = "INSERT INTO pb_inventory_history (process_id, capture_host, capture_user, presentation_id, presentation_batch, presentation_expiration, presentation_serial, update_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-		system.db.runPrepUpdate(update_query, [process_id, local_row["capture_host"], local_row["capture_user"], local_row["presentation_id"], local_row["presentation_batch"], local_row["presentation_expiration"], local_row["presentation_serial"], local_row["update_time"]], database, tx_id)
-		# Update warehouse data.
-		# update_query = "UPDATE pb_inventory_warehouse SET obsolete = TRUE WHERE presentation_id = ? AND presentation_batch = ? AND presentation_serial = ?"
-		# system.db.runPrepUpdate(update_query, [local_row["presentation_id"], local_row["presentation_batch"], local_row["presentation_serial"]], database, tx_id)
-		# update_query = "INSERT INTO pb_inventory_warehouse (presentation_id, presentation_batch, presentation_serial, presentation_expiration, comments) VALUES (?, ?, ?, ?, ?)"
-		# system.db.runPrepUpdate(update_query, [local_row["presentation_id"], local_row["presentation_batch"], local_row["presentation_serial"], local_row["presentation_expiration"], "Salida por consumo"], database, tx_id)
-	system.db.commitTransaction(tx_id)
-	system.db.closeTransaction(tx_id)
-	# Don"t wait for the garbage collector to release the table"s used memory.
-	del capture_table
-	system.db.runPrepUpdate("DELETE FROM pb_inventory_capture WHERE prebatch = 1", [], database)
-	logger.info("[Paragon] store_inventory() [end]")	
 	del logger
 
 if __name__ == '__main__':
