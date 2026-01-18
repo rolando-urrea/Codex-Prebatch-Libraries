@@ -764,7 +764,7 @@ def check_inventory_completion(prebatch_path):
 						component_units = 0
 						for row_index in range(len(table)):
 							# Field loop.
-							for j in range(1, 6):
+							for j in range(1, 5):
 								current_package_component_id = table[row_index]["c" + ("%02d" % j) + "_id"]
 								if current_package_component_id == current_recipe_component:
 									component_units += table[row_index]["units_total"]
@@ -783,7 +783,7 @@ def check_inventory_completion(prebatch_path):
 		if current_correct_flag != result:
 			logger = system.util.getLogger(LOGGER_NAME)
 			logger.infof("[Paragon] check_inventory_completion() [do]: correct: %s", result)
-			del logger
+			logger = None
 
 def main(prebatch_path):
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
