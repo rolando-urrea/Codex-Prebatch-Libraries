@@ -1,124 +1,124 @@
-def analyzeBarcode(barcode):
+def analyze_barcode(prebatch_path, barcode):
 	# Determines the id and string quality from the barcode.
 	# Two formats are supported: with or without parentheses.
 	# With them, the number of letters must be 44; without, 36.
-	# Case A (parentheses) format: (240)1819695(10)0001821150(15)181014(90)0085; (240) productId[char * 7] (10) batch[char * 10] (15) expirationDate[char * 6] (90) serial[char * 4].
-	# Case B (no parentheses) format: 240181969510000182115015181014900085; 240 productId[char * 7] 10 batch[char * 10] 15 expirationDate[char * 6] 90 serial[char * 4].
+	# Case A (parentheses) format: (240)1819695(10)0001821150(15)181014(90)0085; (240) productId[char * 7] (10) batch[char * 10] (15) expiration_date[char * 6] (90) serial[char * 4].
+	# Case B (no parentheses) format: 240181969510000182115015181014900085; 240 productId[char * 7] 10 batch[char * 10] 15 expiration_date[char * 6] 90 serial[char * 4].
 	# This function will return a string for logging purposes. It must add the elements from the barcode to the auxiliary table. Another SCADA function will use this information.
 	#
-	# Rolando Urrea. 2019-09-02.
-	# v1.1.0: 2025-06-05: added the validation for concentrate expiration.
-	# v1.0.1: 2019-02-10: added capability for more than 1 Prebatch system capturing simultaneously.
-	# v1.0.0: 2018-09-02.
-
+	# Rolando Urrea.
+	# 2026-01-23: initial release.
+	# CONSTANTS.
+	# Python 2.7 (Ignition's internal Python version, which does not support variable type forcing (VAR:type = value)).
+	DATABASE = "Process"
 	import re
 	from datetime import datetime
-	database = 'Process'
-
-	result = u''
+	result = u""
 	# Remove the parentheses.
-	cleanCode = re.sub('[()* ]', '', barcode)
+	clean_code = re.sub("[()* ]", "", barcode)
 	# Read specific information.
-	lengthIsRight = False
-	isComplete = False
+	length_is_right = False
+	is_complete = False
 	exists = False
-	isUnique = False
-	isCompatible = False
-	isExpired = False
-	alreadyCaptured = False
-	# Evaluate code size.
-	if (len(cleanCode) == 36) or (len(cleanCode) == 38):
-		lengthIsRight = True
-	result += 'Evaluando: ' + cleanCode + '\n'
+	is_unique = False
+	is_compatible = False
+	is_expired = False
+	already_captured = False
+	# Evaluate the barcode size.
+	if (len(clean_code) == 36) or (len(clean_code) == 38):
+		length_is_right = True
+	result += "Evaluando: " + clean_code + "\n"
+	presentation_id = ""
 	# Check for data to be complete.
-	if (lengthIsRight):
+	if length_is_right:
 		hostname = system.tag.read('[System]Client/Network/Hostname').value
 		username = system.tag.read('[System]Client/User/Username').value
-		presentationId = cleanCode[3:10]
-		presentationBatch = int(cleanCode[12:22])
-		# Some codes have full-length year.	
-		if (len(cleanCode) == 36):
-			presentationExpiration = cleanCode[24:30]
-		elif (len(cleanCode) == 38):
-			presentationExpiration = cleanCode[26:32]
-		expirationEvaluation = presentationExpiration + " 12:00:00"
-		dateFormat = "%y%m%d %H:%M:%S"
-		expirationDate = datetime.strptime(expirationEvaluation, dateFormat)
-		if expirationDate < datetime.now():
-			isExpired = True
-		presentationSerial = int(cleanCode[-4:])
-		if ((presentationBatch > 0) and (presentationSerial > 0)):
-			isComplete = True
+		presentation_id = clean_code[3:10]
+		presentation_batch = int(clean_code[12:22])
+		# Some codes have full-length year.
+		presentation_expiration = ""
+		if len(clean_code) == 36:
+			presentation_expiration = clean_code[24:30]
+		elif len(clean_code) == 38:
+			presentation_expiration = clean_code[26:32]
+		expiration_evaluation = presentation_expiration + " 12:00:00"
+		date_format = "%y%m%d %H:%M:%S"
+		expiration_date = datetime.strptime(expiration_evaluation, date_format)
+		if expiration_date < datetime.now():
+			is_expired = True
+		presentation_serial = int(clean_code[-4:])
+		if (presentation_batch > 0) and (presentation_serial > 0):
+			is_complete = True
 	# Determine if this presentation exists.
-	if (isComplete):
-		table = system.db.runPrepQuery('SELECT * FROM pb_component_presentations_current WHERE presentation_id = ?', [presentationId], database)
-		if (len(table) > 0):
+	if is_complete:
+		table = system.db.runPrepQuery("SELECT * FROM pb_component_presentations_current WHERE presentation_id = ?", [presentation_id], DATABASE)
+		if len(table) > 0:
 			exists = True
 			# Check every concentrate for package compatibility.
-			isCompatible = True
-			tagPath = 'Production/Paragon/Process/recipe/Components/'
-			# Field loop.
-			for i in range(5):
+			is_compatible = True
+			tag_path = "Production/Paragon/Process/recipe/Components/"
+			# Field loop.
+			for i in range(1, 5):
 				# Only for valid components in the package.
-				# There should be only one row in the table.
-				currentPackageRecipeReference = table[0]['recipe_reference']
-				currentPackageComponentId = table[0]['c' + ('%02d' % (i + 1)) + '_id']
-				currentPackageComponentName = table[0]['c' + ('%02d' % (i + 1)) + '_name']
-				if (currentPackageComponentId != '-'):
-					concentrateFound = False
-					# Component slot loop.
-					for j in range(16):
-						currentRecipeComponent = system.tag.read(tagPath + 'c' + ('%02d' % (j + 1)) + '/id').value
-						if (currentPackageComponentId == currentRecipeComponent):
-							concentrateFound = True
-					if not(concentrateFound):
-						isCompatible = False
-						result += '* Componente [' + currentPackageComponentId + '] ' + currentPackageRecipeReference + ' ' + currentPackageComponentName + ' no compatible *\n'
+				# There should be only one row in the table.
+				current_package_recipe_reference = table[0]['recipe_reference']
+				current_package_component_id = table[0]['c' + ('%02d' % i) + '_id']
+				current_package_component_name = table[0]['c' + ('%02d' % i) + '_name']
+				if current_package_component_id != '-':
+					concentrate_found = False
+					# Component slot loop.
+					for j in range(1, 16):
+						current_recipe_component = system.tag.read(tag_path + 'c' + ('%02d' % j) + '/id').value
+						if current_package_component_id == current_recipe_component:
+							concentrate_found = True
+					if not concentrate_found:
+						is_compatible = False
+						result += '* Componente [' + current_package_component_id + '] ' + current_package_recipe_reference + ' ' + current_package_component_name + ' no compatible *\n'
 		# Don't wait for the garbage collector to release the table's used memory.
 		del table
 	# Evaluate for repeated records.
-	if (exists):
-		table = system.db.runPrepQuery('SELECT presentation_id FROM pb_inventory_capture WHERE presentation_id = ? AND presentation_batch = ? AND presentation_serial = ?', [presentationId, presentationBatch, presentationSerial], database)
-		if (len(table) > 0):
-			alreadyCaptured = True
+	if exists:
+		table = system.db.runPrepQuery('SELECT presentation_id FROM pb_inventory_capture WHERE presentation_id = ? AND presentation_batch = ? AND presentation_serial = ?', [presentation_id, presentation_batch, presentation_serial], database)
+		if len(table) > 0:
+			already_captured = True
 			system.tag.write('Production/Paragon/Process/Inventory/currentBarcodeRepeated', True)
 		# Don't wait for the garbage collector to release the table's used memory.
 		del table
-	# Finally, search for the record in the history table.
-	if exists and not(alreadyCaptured):
-		table = system.db.runPrepQuery('SELECT presentation_id FROM pb_inventory_history WHERE presentation_id = ? AND presentation_batch = ? AND presentation_serial = ?', [presentationId, presentationBatch, presentationSerial], database)
-		if (len(table) == 0):
-			isUnique = True
+	# Finally, search for the record in the history table.
+	if exists and not(already_captured):
+		table = system.db.runPrepQuery('SELECT presentation_id FROM pb_inventory_history WHERE presentation_id = ? AND presentation_batch = ? AND presentation_serial = ?', [presentation_id, presentation_batch, presentation_serial], database)
+		if len(table) == 0:
+			is_unique = True
 		# Don't wait for the garbage collector to release the table's used memory.
 		del table
 	# Add to the inventory pool.
-	# Non-compatible packages are also included for visual inspection (the isCompatible flag is not considered for insertion).
-	if (isUnique and not isExpired):
-		result += 'Código: ' + presentationId + ', Lote: ' + str(presentationBatch) + ', Caducidad: ' + presentationExpiration + ', Consecutivo: ' + str(presentationSerial)
+	# Non-compatible packages are also included for visual inspection (the is_compatible flag is not considered for insertion).
+	if (is_unique and not is_expired):
+		result += 'Código: ' + presentation_id + ', Lote: ' + str(presentation_batch) + ', Caducidad: ' + presentation_expiration + ', Consecutivo: ' + str(presentation_serial)
 		# Insert into the auxiliary table.
 		myQuery = 'INSERT INTO pb_inventory_capture (prebatch, capture_host, capture_user, presentation_id, presentation_batch, presentation_expiration, presentation_serial)'
 		myQuery += ' VALUES (?, ?, ?, ?, ?, ?, ?)'
-		system.db.runPrepUpdate(myQuery, [1, hostname, username, presentationId, presentationBatch, presentationExpiration, presentationSerial], database)
+		system.db.runPrepUpdate(myQuery, [1, hostname, username, presentation_id, presentation_batch, presentation_expiration, presentation_serial], database)
 		# Inform if this package is compatible or not.
-		if (isCompatible):
+		if (is_compatible):
 			system.tag.write('Production/Paragon/Process/Inventory/currentBarcodeIsCorrect', True)
 		else:
 			result += '\nERROR: este paquete no es compatible con la receta seleccionada'
 			system.tag.write('Production/Paragon/Process/Inventory/wrongCodesExist', True)
 	else:
-		if alreadyCaptured:
-			result += 'Paquete ya capturado; Código: ' + presentationId + ', Lote: ' + str(presentationBatch) + ', Caducidad: ' + presentationExpiration + ', Consecutivo: ' + str(presentationSerial)
+		if already_captured:
+			result += 'Paquete ya capturado; Código: ' + presentation_id + ', Lote: ' + str(presentation_batch) + ', Caducidad: ' + presentation_expiration + ', Consecutivo: ' + str(presentation_serial)
 		else:
 			reason = ''
-			if not(lengthIsRight):
+			if not(length_is_right):
 				reason += 'la longitud del código es incorrecta'
-			elif not(isComplete):
+			elif not(is_complete):
 				reason += 'falta información en la cadena'
 			elif not(exists):
 				reason += 'no existe la referencia a este paquete en la base de datos'
-			elif not(isUnique):
+			elif not(is_unique):
 				reason += 'este paquete ya ha sido utilizado previamente'
-			elif isExpired:
+			elif is_expired:
 				reason += 'concentrados caducados'
 			result += 'ERROR: ' + reason
 			system.tag.write('Production/Paragon/Process/Inventory/wrongCodesExist', True)
