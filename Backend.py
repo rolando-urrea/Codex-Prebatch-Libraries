@@ -738,6 +738,13 @@ def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/tankAgitationWater", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/userName", "-")
 
+def initialize_inventory_flags(prebatch_path):
+	inventory_path = prebatch_path + "Process/Inventory/"
+	system.tag.writeBlocking(inventory_path + "correct", False)
+	system.tag.writeBlocking(inventory_path + "currentBarcodeIsCorrect", False)
+	system.tag.writeBlocking(inventory_path + "skip", False)
+	system.tag.writeBlocking(inventory_path + "wrongCodesExist", False)
+
 def module_available(prebatch_path, transfer_position):
 	units_path = prebatch_path + "Units/"
 	units = system.tag.browse(path=units_path, recursive=False)
@@ -939,6 +946,7 @@ def main(prebatch_path):
 							save_inventory(prebatch_path)
 						save_final_data_running_recipe(prebatch_path)
 					initialize_flags(prebatch_path)
+					initialize_inventory_flags(prebatch_path)
 					clear_all_execution_plans(prebatch_path)
 					clear_all_recipes(prebatch_path)
 					system.tag.writeBlocking(prebatch_path + "Process/processing", False)
