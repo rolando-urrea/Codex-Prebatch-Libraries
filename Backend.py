@@ -734,6 +734,7 @@ def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/userUnits", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/currentPosition", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/maxPosition", 0)
+	system.tag.writeBlocking(prebatch_path + "Process/tank", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/tankAgitationWater", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/userName", "-")
 
