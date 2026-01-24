@@ -796,11 +796,13 @@ def check_inventory_completion(prebatch_path):
 					result = False
 				# Don't wait for the garbage collector to release the table's used memory.
 				table = None
-			system.tag.write("Production/Paragon/Process/Inventory/correct", result)
+			system.tag.write(prebatch_path + "/Process/Inventory/correct", result)
 			# Send a message to the logger only if there's a change in the correct flag.
 			if current_correct_flag != result:
 				if LOG_INFO_EVENTS:
-					logger.infof("[Paragon] check_inventory_completion() [do]: correct: %s", result)
+					prebatch_name = system.tag.read(prebatch_path + "/Process/prebatchName").value
+					logger.infof("[%s] check_inventory_completion() [do]: correct: %s", prebatch_name, result)
+				system.tag.writeBlocking(prebatch_path + "Process/Inventory/correct", result)
 	except:
 		prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 		logger.errorf("[%s] check_inventory_completion() [error]: %s", prebatch_name, str(sys.exc_info()))
