@@ -19,7 +19,7 @@ def analyze_barcode(prebatch_path, barcode):
 	import re
 	from datetime import datetime
 	result = u""
-	# Remove the parentheses.
+	# Remove the parentheses and other unnecessary characters from the barcode, leaving only the numeric part.
 	clean_code = re.sub("[()* ]", "", barcode)
 	# Read specific information.
 	length_is_right = False
