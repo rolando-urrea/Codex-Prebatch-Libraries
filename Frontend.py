@@ -110,7 +110,7 @@ def analyze_barcode(prebatch_path, barcode):
 			system.tag.writeBlocking(prebatch_path + "Process/Inventory/currentBarcodeIsCorrect", True)
 		else:
 			result += "\nERROR: este paquete no es compatible con la receta seleccionada"
-			system.tag.write(prebatch_path + "Process/Inventory/wrongCodesExist", True)
+			system.tag.writeBlocking(prebatch_path + "Process/Inventory/wrongCodesExist", True)
 	else:
 		if already_captured:
 			result += "Paquete ya capturado; Código: " + presentation_id + ", Lote: " + str(presentation_batch) + ", Caducidad: " + presentation_expiration + ", Consecutivo: " + str(presentation_serial)
@@ -127,5 +127,5 @@ def analyze_barcode(prebatch_path, barcode):
 			elif is_expired:
 				reason += "concentrados caducados"
 			result += "ERROR: " + reason
-			system.tag.write("Production/Paragon/Process/Inventory/wrongCodesExist", True)
+			system.tag.writeBlocking(prebatch_path + "/Process/Inventory/wrongCodesExist", True)
 	return result
