@@ -1,3 +1,13 @@
+# Prebatch Frontend function library v2.0.0 ALPHA.
+# To be used on Inductive Automation's Ignition platform.
+#
+# Rolando Urrea.
+# 2026-01-23: initial release.
+
+# CONSTANTS.
+# Python 2.7 (Ignition's internal Python version, which does not support variable type forcing (VAR:type = value)).
+DATABASE = "Process"
+
 def analyze_barcode(prebatch_path, barcode):
 	# Determines the id and string quality from the barcode.
 	# Two formats are supported: with or without parentheses.
@@ -5,12 +15,7 @@ def analyze_barcode(prebatch_path, barcode):
 	# Case A (parentheses) format: (240)1819695(10)0001821150(15)181014(90)0085; (240) productId[char * 7] (10) batch[char * 10] (15) expiration_date[char * 6] (90) serial[char * 4].
 	# Case B (no parentheses) format: 240181969510000182115015181014900085; 240 productId[char * 7] 10 batch[char * 10] 15 expiration_date[char * 6] 90 serial[char * 4].
 	# This function will return a string for logging purposes. It must add the elements from the barcode to the auxiliary table. Another SCADA function will use this information.
-	#
-	# Rolando Urrea.
-	# 2026-01-23: initial release.
-	# CONSTANTS.
-	# Python 2.7 (Ignition's internal Python version, which does not support variable type forcing (VAR:type = value)).
-	DATABASE = "Process"
+
 	import re
 	from datetime import datetime
 	result = u""
