@@ -2,6 +2,7 @@
 # To be used on Inductive Automation's Ignition platform.
 #
 # Rolando Urrea.
+# Cobalt Processworks.
 # 2025-12-14: initial release.
 
 # CONSTANTS.
