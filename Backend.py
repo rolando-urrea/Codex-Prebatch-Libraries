@@ -231,6 +231,7 @@ def clear_execution_position(position_path):
 	system.tag.writeBlocking(position_path + "agitationDuration", 0)
 	system.tag.writeBlocking(position_path + "bayonet", False)
 	system.tag.writeBlocking(position_path + "components", "")
+	system.tag.writeBlocking(position_path + "currentCycle", 0)
 	system.tag.writeBlocking(position_path + "cycles", 0)
 	system.tag.writeBlocking(position_path + "hardDissolving", False)
 	system.tag.writeBlocking(position_path + "heatingSetpoint", 0)
@@ -895,7 +896,10 @@ def save_final_data_running_recipe(prebatch_path):
 		water = system.tag.read(tank_accum_path + "water").value
 		sucrose = system.tag.read(tank_accum_path + "sucrose").value
 		fructose = system.tag.read(tank_accum_path + "fructose").value
-		system.db.runPrepUpdate("INSERT INTO tanks_data (process_id, tank_id, recipe_id, sucrose, fructose, water) VALUES (?, ?, ?, ?, ?, ?)", [process_id, tank, recipe_id, sucrose, fructose, water], DATABASE)
+		# Prevent double insertion.
+		stored_process_id = system.db.runScalarPrepQuery("SELECT process_id FROM finished_syrup_tanks_data WHERE process_id = ?", [process_id], DATABASE)
+		if stored_process_id is None:
+			system.db.runPrepUpdate("INSERT INTO finished_syrup_tanks_data (process_id, tank_id, sucrose, fructose, water) VALUES (?, ?, ?, ?, ?)", [process_id, tank, sucrose, fructose, water], DATABASE)
 		logger.infof("[%s] save_final_data_running_recipe() [do]: recipeId: %s, recipeName: %s, processId: %d", prebatch_name, recipe_id, recipe_name, process_id)
 	except:
 		logger.errorf("[%s] save_final_data_running_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
