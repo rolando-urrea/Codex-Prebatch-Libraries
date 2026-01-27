@@ -259,9 +259,8 @@ def clear_all_execution_plans(prebatch_path):
 		logger.infof("[%s] clear_execution_plans() [end]", prebatch_name)
 	logger = None
 
-def copy_position(source_position_path, target_position_path, cycles):
+def copy_execution_position(source_position_path, target_position_path, cycles):
 	# Don't consider this function in the logger's scope; it would produce too much detail.
-	# Omit the mass and water tags, since those are calculated in other functions.
 	system.tag.writeBlocking(target_position_path + "agitationAutomatic", system.tag.read(source_position_path + "agitationAutomatic").value)
 	system.tag.writeBlocking(target_position_path + "agitationDuration", system.tag.read(source_position_path + "agitationDuration").value)
 	system.tag.writeBlocking(target_position_path + "bayonet", system.tag.read(source_position_path + "bayonet").value)
@@ -269,14 +268,26 @@ def copy_position(source_position_path, target_position_path, cycles):
 	system.tag.writeBlocking(target_position_path + "hardDissolving", system.tag.read(source_position_path + "hardDissolving").value)
 	system.tag.writeBlocking(target_position_path + "heatingSetpoint", system.tag.read(source_position_path + "heatingSetpoint").value)
 	system.tag.writeBlocking(target_position_path + "liquidsTank", system.tag.read(source_position_path + "liquidsTank").value)
-	# system.tag.writeBlocking(target_position_path + "mass", system.tag.read(source_position_path + "mass").value)
+	system.tag.writeBlocking(target_position_path + "mass", system.tag.read(source_position_path + "mass").value)
 	system.tag.writeBlocking(target_position_path + "processUnit", system.tag.read(source_position_path + "processUnit").value)
 	system.tag.writeBlocking(target_position_path + "requiresHeating", system.tag.read(source_position_path + "requiresHeating").value)
 	system.tag.writeBlocking(target_position_path + "solidsVacuum", system.tag.read(source_position_path + "solidsVacuum").value)
 	system.tag.writeBlocking(target_position_path + "transferPosition", system.tag.read(source_position_path + "transferPosition").value)
 	system.tag.writeBlocking(target_position_path + "type", system.tag.read(source_position_path + "type").value)
-	# system.tag.writeBlocking(target_position_path + "water", system.tag.read(source_position_path + "water").value)
+	system.tag.writeBlocking(target_position_path + "water", system.tag.read(source_position_path + "water").value)
 	system.tag.writeBlocking(target_position_path + "cycles", cycles)
+
+def copy_execution_plan(source_execution_plan_path, target_execution_plan_path):
+	for i in range(1, POSITION_SLOTS + 1):
+		# Define the current positions' paths.
+		current_execution_position_path = source_execution_plan_path + "Positions/p" + ("%02d" % i) + "/"
+		target_execution_plan_path = target_execution_plan_path + "Positions/p" + ("%02d" % i) + "/"
+		# Evaluate the process unit.
+		process_unit = system.tag.read(current_execution_position_path + "processUnit").value
+		# Empty slots will have the Process Unit tag equal to "".
+		if process_unit != "":
+			position_cycles = system.tag.read(current_execution_position_path + "positionCycles").value
+			copy_execution_position(current_execution_position_path, target_execution_plan_path, position_cycles)
 
 def get_default_unit(prebatch_path):
 	# Don't consider this function in the logger's scope; it would produce too much detail.
@@ -532,6 +543,7 @@ def calculate(prebatch_path, tank_path, units):
 			process_unit = system.tag.read(current_base_position_path + "processUnit").value
 			# Empty slots will have the Process Unit tag equal to "".
 			if process_unit != "":
+				copy_execution_position(current_base_position_path, current_production_position_path, 1)
 				calculated_mass = system.tag.read(current_base_position_path + "mass").value * units
 				system.tag.writeBlocking(current_production_position_path + "mass", calculated_mass)
 				# Ensure the water volume is enough for agitation.
@@ -557,9 +569,9 @@ def calculate(prebatch_path, tank_path, units):
 						if pu_capacity > 0:
 							cycles = math.ceil(calculated_volume / pu_capacity)
 				system.tag.writeBlocking(current_production_position_path + "water", calculated_water)
+				system.tag.writeBlocking(current_production_position_path + "cycles", cycles)
 				if LOG_INFO_EVENTS:
 					logger.infof("[%s] calculate() [do]: unit %s found for %s; cycles = %d", prebatch_name, process_unit, components, int(cycles))
-				copy_position(current_base_position_path, current_production_position_path, cycles)
 				system.tag.writeBlocking(prebatch_path + "maxPosition", i)
 		# Set the Calculated Units.
 		system.tag.writeBlocking(prebatch_path + "Process/calculatedUnits", units)
@@ -1003,19 +1015,19 @@ def process_component(position, in_transfer_position):
 	if (process_unit == "T-01"):
 		# Copy the position if required.
 		if (system.tag.read("Production/Paragon/Tanks/T01/executionPosition/cition").value != position):
-			copy_position("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/", "Production/Paragon/Tanks/T01/executionPosition/", 1)
+			copy_execution_position("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/", "Production/Paragon/Tanks/T01/executionPosition/", 1)
 		system.tag.writeSynchronous("Production/Paragon/Tanks/T01/inTransferPosition", in_transfer_position, 5000)
 	# Tank T-02.
 	if (process_unit == "T-02"):
 		# Copy the position if required.
 		if (system.tag.read("Production/Paragon/Tanks/T02/executionPosition/cition").value != position):
-			copy_position("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/", "Production/Paragon/Tanks/T02/executionPosition/", 1)
+			copy_execution_position("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/", "Production/Paragon/Tanks/T02/executionPosition/", 1)
 		system.tag.writeSynchronous("Production/Paragon/Tanks/T02/inTransferPosition", in_transfer_position, 5000)
 	# Bayonet.
 	if (process_unit == "B-01"):
 		# Copy the position if required.
 		if (system.tag.read("Production/Paragon/Tanks/B01/executionPosition/cition").value != position):
-			copy_position("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/", "Production/Paragon/Tanks/B01/executionPosition/", 1)
+			copy_execution_position("Production/Paragon/Process/executionPlan/cition" + ("%02d" % position) + "/", "Production/Paragon/Tanks/B01/executionPosition/", 1)
 		system.tag.writeSynchronous("Production/Paragon/Tanks/B01/inTransferPosition", in_transfer_position, 5000)
 	logger.infof("[Paragon] process_component(position: %d, in_transfer_position: %s) [end]", position, in_transfer_position)
 	del logger
