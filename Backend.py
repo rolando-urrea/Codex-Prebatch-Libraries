@@ -17,7 +17,7 @@ DATABASE = "Process"
 # Process setup.
 POSITION_SLOTS = 16
 PROCESSOR_MANAGED = True
-BARCODE_EVALUATION = True
+BARCODE_EVALUATION = False
 # Estimation for volume evaluation.
 SWEETENER_DENSITY = 1.30
 SIMPLE_SYRUP_BRIX = 0.60
@@ -286,7 +286,7 @@ def copy_execution_plan(source_execution_plan_path, target_execution_plan_path):
 		process_unit = system.tag.read(current_execution_position_path + "processUnit").value
 		# Empty slots will have the Process Unit tag equal to "".
 		if process_unit != "":
-			position_cycles = system.tag.read(current_execution_position_path + "positionCycles").value
+			position_cycles = system.tag.read(current_execution_position_path + "cycles").value
 			copy_execution_position(current_execution_position_path, target_execution_plan_path, position_cycles)
 
 def get_default_unit(prebatch_path):
@@ -607,6 +607,8 @@ def save_process_data(prebatch_path):
 		tank = system.tag.read(prebatch_path + "Process/tank").value
 		units = system.tag.read(prebatch_path + "Process/calculatedUnits").value
 		user_name = system.tag.read(prebatch_path + "Process/userName").value
+		if user_name is None:
+			user_name = ""
 		update_query = "INSERT INTO pb_recipes_executed (prebatch_number, tank, process_id, recipe_id, recipe_version, units, user_name"
 		for i in range(POSITION_SLOTS):
 			update_query += ", c" + ("%02d" % (i + 1)) + "_version"
@@ -734,6 +736,8 @@ def coordinate(prebatch_path):
 		system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", True)
 
 def initialize_flags(prebatch_path):
+	system.tag.writeBlocking(prebatch_path + "Process/start", False)
+	system.tag.writeBlocking(prebatch_path + "Process/started", False)
 	system.tag.writeBlocking(prebatch_path + "Process/abort", False)
 	system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", False)
 	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
@@ -827,7 +831,7 @@ def save_inventory(prebatch_path):
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	prebatch_number = system.tag.read(prebatch_path + "Process/prebatchNumber").value
 	if LOG_INFO_EVENTS:
-		logger.infof("[%s] store_inventory() [start]", prebatch_name)
+		logger.infof("[%s] save_inventory() [start]", prebatch_name)
 	try:
 		# Transfers the records from the capture table to the history one.
 		process_id = system.tag.read(prebatch_path + "Process/processId").value
@@ -852,7 +856,7 @@ def save_inventory(prebatch_path):
 		capture_table = None
 		system.db.runPrepUpdate("DELETE FROM pb_inventory_capture WHERE prebatch = 1", [], DATABASE)
 	except:
-		logger.errorf("[%s] store_inventory() [error]: %s", prebatch_name, str(sys.exc_info()))
+		logger.errorf("[%s] save_inventory() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] store_inventory() [end]", prebatch_name)
@@ -865,7 +869,11 @@ def cancel_running_recipe(prebatch_path):
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] cancel_running_recipe() [start]", prebatch_name)
 	try:
-		system.db.runPrepUpdate("INSERT INTO pb_recipes_canceled (process_id) VALUES (?)", [process_id], DATABASE)
+		# Prevent error from a previously inserted canceled recipe id.
+		# This could happen when there was a previous exception and this line was reached.
+		stored_canceled_recipe_id = system.db.runScalarPrepQuery("SELECT process_id FROM pb_recipes_canceled WHERE process_id = ?", [process_id], DATABASE)
+		if stored_canceled_recipe_id is None:
+			system.db.runPrepUpdate("INSERT INTO pb_recipes_canceled (process_id) VALUES (?)", [process_id], DATABASE)
 	except:
 		logger.errorf("[%s] cancel_running_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
@@ -877,7 +885,7 @@ def save_final_data_running_recipe(prebatch_path):
 	logger = system.util.getLogger(LOGGER_NAME)
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	if LOG_INFO_EVENTS:
-		logger.infoF("[%S] save_final_data_running_recipe() [start]", prebatch_name)
+		logger.infof("[%S] save_final_data_running_recipe() [start]", prebatch_name)
 	try:
 		process_id = system.tag.read(prebatch_path + "Process/processId").value
 		tank = system.tag.read(prebatch_path + "Process/tank").value
@@ -903,7 +911,7 @@ def main(prebatch_path):
 	if not system_alarmed:
 		if machine_conditions_ready(prebatch_path):
 			# The base point of the evaluation is the Started tag and its quality.
-			started_tag = system.tag.read(prebatch_path + "Process/started")
+			started_tag = system.tag.read(prebatch_path + "Process/start")
 			# First, check the PLC is online.
 			if started_tag.quality.isGood:
 				started = started_tag.value
@@ -917,8 +925,8 @@ def main(prebatch_path):
 							coordinate(prebatch_path)
 					else:
 						system.tag.writeBlocking(prebatch_path + "Process/processing", True)
+						copy_execution_plan(prebatch_path + "Process/productionExecutionPlan/", prebatch_path + "Process/productionOPCExecutionPlan/")
 						save_process_data(prebatch_path)
-						# TODO: transfer the Production Execution Plan to the OPC one; also the Production Recipe to the OPC Recipe (create the object).
 						system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 				else:
 					# The Loaded flag involves that a valid recipe was selected, as well as the target tank.
