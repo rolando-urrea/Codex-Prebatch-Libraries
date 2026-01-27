@@ -738,7 +738,7 @@ def coordinate(prebatch_path):
 
 def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/start", False)
-	system.tag.writeBlocking(prebatch_path + "Process/started", False)
+	# system.tag.writeBlocking(prebatch_path + "Process/started", False)
 	system.tag.writeBlocking(prebatch_path + "Process/abort", False)
 	system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", False)
 	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
@@ -915,7 +915,7 @@ def main(prebatch_path):
 	if not system_alarmed:
 		if machine_conditions_ready(prebatch_path):
 			# The base point of the evaluation is the Started tag and its quality.
-			started_tag = system.tag.read(prebatch_path + "Process/start")
+			started_tag = system.tag.read(prebatch_path + "Process/started")
 			# First, check the PLC is online.
 			if started_tag.quality.isGood:
 				started = started_tag.value
@@ -929,7 +929,6 @@ def main(prebatch_path):
 							coordinate(prebatch_path)
 					else:
 						system.tag.writeBlocking(prebatch_path + "Process/processing", True)
-						copy_execution_plan(prebatch_path + "Process/productionExecutionPlan/", prebatch_path + "Process/productionOPCExecutionPlan/")
 						save_process_data(prebatch_path)
 						system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 				else:
@@ -945,6 +944,9 @@ def main(prebatch_path):
 						if calculated_units != user_units or calculated_units == 0:
 							system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 							calculate(prebatch_path, tank_path, user_units)
+							copy_execution_plan(prebatch_path + "Process/productionExecutionPlan/",
+							# Transfer the execution plan to the processor.
+							prebatch_path + "Process/productionOPCExecutionPlan/")
 							system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 						# Evaluate inventory completion (if it's available).
 						if BARCODE_EVALUATION:
@@ -974,8 +976,8 @@ def main(prebatch_path):
 						save_final_data_running_recipe(prebatch_path)
 					initialize_flags(prebatch_path)
 					initialize_inventory_flags(prebatch_path)
-					clear_all_execution_plans(prebatch_path)
 					clear_all_recipes(prebatch_path)
+					clear_all_execution_plans(prebatch_path)
 					system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 
 def initialize_module(position):
