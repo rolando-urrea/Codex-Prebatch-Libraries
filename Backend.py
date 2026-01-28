@@ -246,7 +246,7 @@ def clear_execution_position(position_path):
 
 def clear_all_execution_plans(prebatch_path):
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
-	executions_plans = ["baseExecutionPlan", "productionExecutionPlan", "productionOPCExecutionPlan"]
+	executions_plans = ["baseExecutionPlan", "productionExecutionPlan", "OPCProductionExecutionPlan"]
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] clear_execution_plans() [start]", prebatch_name)
@@ -954,7 +954,7 @@ def main(prebatch_path):
 							system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 							calculate(prebatch_path, tank_path, user_units)
 							# Transfer the execution plan to the processor.
-							copy_execution_plan(prebatch_path, prebatch_path + "Process/productionExecutionPlan/", prebatch_path + "Process/productionOPCExecutionPlan/")
+							copy_execution_plan(prebatch_path, prebatch_path + "Process/productionExecutionPlan/", prebatch_path + "Process/OPCProductionExecutionPlan/")
 							system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 						# Evaluate inventory completion (if it's available).
 						if BARCODE_EVALUATION:
