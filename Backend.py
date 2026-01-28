@@ -278,17 +278,24 @@ def copy_execution_position(source_position_path, target_position_path, cycles):
 	system.tag.writeBlocking(target_position_path + "water", system.tag.read(source_position_path + "water").value)
 	system.tag.writeBlocking(target_position_path + "cycles", cycles)
 
-def copy_execution_plan(source_execution_plan_path, target_execution_plan_path):
+def copy_execution_plan(prebatch_path, source_execution_plan_path, target_execution_plan_path):
+	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
+	logger = system.util.getLogger(LOGGER_NAME)
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] copy_execution_plan(source: %s, target: %s) [start]", prebatch_name, source_execution_plan_path, target_execution_plan_path)
 	for i in range(1, POSITION_SLOTS + 1):
 		# Define the current positions' paths.
 		current_execution_position_path = source_execution_plan_path + "Positions/p" + ("%02d" % i) + "/"
-		target_execution_plan_path = target_execution_plan_path + "Positions/p" + ("%02d" % i) + "/"
+		current_target_execution_plan_path = target_execution_plan_path + "Positions/p" + ("%02d" % i) + "/"
 		# Evaluate the process unit.
 		process_unit = system.tag.read(current_execution_position_path + "processUnit").value
 		# Empty slots will have the Process Unit tag equal to "".
 		if process_unit != "":
 			position_cycles = system.tag.read(current_execution_position_path + "cycles").value
-			copy_execution_position(current_execution_position_path, target_execution_plan_path, position_cycles)
+			copy_execution_position(current_execution_position_path, current_target_execution_plan_path, position_cycles)
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] copy_execution_plan(source: %s, target: %s) [end]", prebatch_name, source_execution_plan_path, target_execution_plan_path)
+	logger = None
 
 def get_default_unit(prebatch_path):
 	# Don't consider this function in the logger's scope; it would produce too much detail.
@@ -573,7 +580,7 @@ def calculate(prebatch_path, tank_path, units):
 				system.tag.writeBlocking(current_production_position_path + "cycles", cycles)
 				if LOG_INFO_EVENTS:
 					logger.infof("[%s] calculate() [do]: unit %s found for %s; cycles = %d", prebatch_name, process_unit, components, int(cycles))
-				system.tag.writeBlocking(prebatch_path + "maxPosition", i)
+				system.tag.writeBlocking(prebatch_path + "Process/maxPosition", i)
 		# Set the Calculated Units.
 		system.tag.writeBlocking(prebatch_path + "Process/calculatedUnits", units)
 	except:
@@ -944,9 +951,8 @@ def main(prebatch_path):
 						if calculated_units != user_units or calculated_units == 0:
 							system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 							calculate(prebatch_path, tank_path, user_units)
-							copy_execution_plan(prebatch_path + "Process/productionExecutionPlan/",
 							# Transfer the execution plan to the processor.
-							prebatch_path + "Process/productionOPCExecutionPlan/")
+							copy_execution_plan(prebatch_path, prebatch_path + "Process/productionExecutionPlan/", prebatch_path + "Process/productionOPCExecutionPlan/")
 							system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 						# Evaluate inventory completion (if it's available).
 						if BARCODE_EVALUATION:
