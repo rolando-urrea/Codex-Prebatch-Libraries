@@ -383,9 +383,11 @@ def set_base_execution_plan(prebatch_path):
 					components += ", " + system.tag.read(component_path + "componentName").value
 					mass += system.tag.read(component_path + "mass").value
 					water += system.tag.read(component_path + "water").value
-					# If there's a solid in the position, force the type to solid and the unit to common.
-					if component_type == 1:
-						system.tag.writeBlocking(position_path + "type", 1)
+					# Check if the prior component is different from the current one.
+					# If so, assign the common unit to the position.
+					assigned_component_type = system.tag.read(position_path + "type").value
+					if assigned_component_type != component_type:
+						system.tag.writeBlocking(position_path + "type", 3)
 						process_unit = get_unit_from_capability(prebatch_path, "common")
 				# Set the new value for the component's property and the accumulated data.
 				system.tag.writeBlocking(position_path + "components", components)
