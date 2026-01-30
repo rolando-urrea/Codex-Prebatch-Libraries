@@ -670,7 +670,7 @@ def coordinate_solids_unit(prebatch_path, pu_path):
 			agitated = system.tag.read(pu_path + "Agitation/done").value
 			transferred = system.tag.read(pu_path + "transferred").value
 			current_cycle = system.tag.read(pu_path + "executionPosition/currentCycle").value
-			progress_table = system.db.runPrepQuery("SELECT * FROM pb_recipes_progress WHERE process_id = ? AND transfer_position = ?", [process_id, transfer_position], DATABASE)
+			progress_table = system.db.runPrepQuery("SELECT * FROM pb_recipes_progress WHERE process_id = ? AND transfer_position = ? AND cycle = ?", [process_id, transfer_position, current_cycle], DATABASE)
 			# Step 1: sequence started.
 			if started and not(step_stored(1, current_cycle, progress_table)):
 				system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, transfer_position, step, cycle) VALUES (?, ?, ?, ?)", [process_id, transfer_position, 1, current_cycle], DATABASE)
@@ -713,6 +713,7 @@ def coordinate_liquids_unit(prebatch_path, pu_path):
 			components = system.tag.read(pu_path + "executionPosition/components").value
 			started = system.tag.read(pu_path + "start").value
 			transferred = system.tag.read(pu_path + "transferred").value
+			# Liquids have no more than one cycle, so there's no need for its validation in the query.
 			progress_table = system.db.runPrepQuery("SELECT * FROM pb_recipes_progress WHERE process_id = ? AND transfer_position = ?", [process_id, transfer_position], DATABASE)
 			# Step 1: sequence started.
 			if started and not(step_stored(1, 1, progress_table)):
