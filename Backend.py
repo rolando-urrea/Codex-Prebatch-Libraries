@@ -578,7 +578,9 @@ def calculate(prebatch_path, tank_path, units):
 					if pu_capacity is not None:
 						if pu_capacity > 0:
 							cycles = math.ceil(calculated_volume / pu_capacity)
-				system.tag.writeBlocking(current_production_position_path + "water", calculated_water)
+				if cycles == 0:
+					cycles = 1
+				system.tag.writeBlocking(current_production_position_path + "water", calculated_water / cycles)
 				system.tag.writeBlocking(current_production_position_path + "cycles", cycles)
 				if LOG_INFO_EVENTS:
 					logger.infof("[%s] calculate() [do]: unit %s found for %s; cycles = %d", prebatch_name, process_unit, components, int(cycles))
@@ -665,7 +667,7 @@ def coordinate_solids_unit(prebatch_path, pu_path):
 			pu_name = system.tag.read(pu_path + "name").value
 			components = system.tag.read(pu_path + "executionPosition/components").value
 			started = system.tag.read(pu_path + "start").value
-			water_added = system.tag.read(pu_path + "Water/complete").value
+			water_added = system.tag.read(pu_path + "WaterCycle/complete").value
 			concentrate_added = system.tag.read(pu_path + "concentrateAdded").value
 			agitated = system.tag.read(pu_path + "Agitation/done").value
 			transferred = system.tag.read(pu_path + "transferred").value
@@ -678,7 +680,7 @@ def coordinate_solids_unit(prebatch_path, pu_path):
 					logger.infof("[%s] coordinate_solids_unit [do]: update STARTED status for %s (%s)", prebatch_name, pu_name, components)
 				# Step 2: water was added.
 				if started and water_added and not(step_stored(2, current_cycle, progress_table)):
-					water_accum = system.tag.read(pu_path + "Water/accum").value
+					water_accum = system.tag.read(pu_path + "WaterCycle/accum").value
 					system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, transfer_position, step, cycle, water) VALUES (?, ?, ?, ?, ?)", [process_id, transfer_position, 2, current_cycle, water_accum], DATABASE)
 					logger.infof("[%s] coordinate_solids_unit [do]: update WATER ADDED status for %s (%s) [%.2f L]", prebatch_name, pu_name, components, water_accum)
 				# Step 3: the concentrate was added.
@@ -691,11 +693,9 @@ def coordinate_solids_unit(prebatch_path, pu_path):
 					logger.infof("[%s] coordinate_solids_unit [do]: update AGITATION CONCLUDED status for %s (%s)", prebatch_name, pu_name, components)
 				# Step 5: the concentrate was transferred.
 				if started and transferred and not(step_stored(5, current_cycle, progress_table)):
-					total_water = system.tag.read(pu_path + "Water/total").value
-					if total_water > 0:
-						system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, transfer_position, step, cycle, water) VALUES (?, ?, ?, ?)", [process_id, transfer_position, 5, current_cycle, total_water], DATABASE)
-						# system.tag.write("Production/Paragon/Process/T01/transferredConfirmation", 1)
-						logger.infof("[%s] coordinate_solids_unit [do]: update TRANSFERRED status for %s (%s) [%.2f L]", prebatch_name, pu_name, components, total_water)
+					rinse_accum = system.tag.read(pu_path + "RinseCycle/accum").value
+					system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, transfer_position, step, cycle, water) VALUES (?, ?, ?, ?, ?)", [process_id, transfer_position, 5, current_cycle, rinse_accum], DATABASE)
+					logger.infof("[%s] coordinate_solids_unit [do]: update TRANSFERRED status for %s (%s) [%.2f L]", prebatch_name, pu_name, components, rinse_accum)
 	except:
 		logger.errorf("[%s] coordinate_solids_unit() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
@@ -723,10 +723,9 @@ def coordinate_liquids_unit(prebatch_path, pu_path):
 				logger.infof("[%s] coordinate_liquids_unit [do]: update STARTED status for %s (%s)", prebatch_name, pu_name, components)
 			# Step 5: the concentrate was transferred.
 			if started and transferred and not(step_stored(5, 1, progress_table)):
-				total_water = system.tag.read(pu_path + "Water/total").value
-				if total_water > 0:
-					system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, transfer_position, step, cycle, water) VALUES (?, ?, ?, ?, ?)", [process_id, transfer_position, 5, current_cycle, total_water], DATABASE)
-					logger.infof("[%s] coordinate_liquids_unit [do]: update TRANSFERRED status for %s (%s) [%.2f L]", prebatch_name, pu_name, components, total_water)
+				rinse_accum = system.tag.read(pu_path + "WaterCycle/accum").value
+				system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, transfer_position, step, cycle, water) VALUES (?, ?, ?, ?, ?)", [process_id, transfer_position, 5, current_cycle, rinse_accum], DATABASE)
+				logger.infof("[%s] coordinate_liquids_unit [do]: update TRANSFERRED status for %s (%s) [%.2f L]", prebatch_name, pu_name, components, rinse_accum)
 	except:
 		logger.errorf("[%s] coordinate_liquids_unit() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
