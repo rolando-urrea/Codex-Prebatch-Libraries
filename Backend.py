@@ -620,8 +620,8 @@ def save_process_data(prebatch_path):
 		if user_name is None:
 			user_name = ""
 		update_query = "INSERT INTO pb_recipes_executed (prebatch_number, tank, process_id, recipe_id, recipe_version, units, user_name"
-		for i in range(POSITION_SLOTS):
-			update_query += ", c" + ("%02d" % (i + 1)) + "_version"
+		for i in range(1, POSITION_SLOTS + 1):
+			update_query += ", c" + ("%02d" % i) + "_version"
 		update_query += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		system.db.runPrepUpdate(update_query, [prebatch_number, tank, process_id, recipe_id, recipe_version, units, user_name,
 											   system.tag.read(recipe_path + "Components/c01/componentVersion").value, system.tag.read(recipe_path + "Components/c02/componentVersion").value,
@@ -649,9 +649,7 @@ def save_process_data(prebatch_path):
 def step_stored(step, cycle, progress_table):
 	result = False
 	for row_index in range(len(progress_table)):
-		# TODO: include the cycle field.
-		# if step == progress_table[row_index]["step"] and cycle == progress_table[row_index]["cycle"]:
-		if step == progress_table[row_index]["step"]:
+		if step == progress_table[row_index]["step"] and cycle == progress_table[row_index]["cycle"]:
 			result = True
 	return result
 
@@ -672,7 +670,7 @@ def coordinate_solids_unit(prebatch_path, pu_path):
 			agitated = system.tag.read(pu_path + "Agitation/done").value
 			transferred = system.tag.read(pu_path + "transferred").value
 			current_cycle = system.tag.read(pu_path + "executionPosition/currentCycle").value
-			progress_table = system.db.runQuery("SELECT * FROM pb_recipes_progress_sorted WHERE process_id = " + ("%d" % process_id) + " AND transfer_position = " + ("%d" % transfer_position), DATABASE)
+			progress_table = system.db.runPrepQuery("SELECT * FROM pb_recipes_progress WHERE process_id = ? AND transfer_position = ?", [process_id, transfer_position], DATABASE)
 			# Step 1: sequence started.
 			if started and not(step_stored(1, current_cycle, progress_table)):
 				system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, transfer_position, step, cycle) VALUES (?, ?, ?, ?)", [process_id, transfer_position, 1, current_cycle], DATABASE)
@@ -715,7 +713,7 @@ def coordinate_liquids_unit(prebatch_path, pu_path):
 			components = system.tag.read(pu_path + "executionPosition/components").value
 			started = system.tag.read(pu_path + "start").value
 			transferred = system.tag.read(pu_path + "transferred").value
-			progress_table = system.db.runQuery("SELECT * FROM pb_recipes_progress_sorted WHERE process_id = " + ("%d" % process_id) + " AND transfer_position = " + ("%d" % transfer_position), DATABASE)
+			progress_table = system.db.runPrepQuery("SELECT * FROM pb_recipes_progress WHERE process_id = ? AND transfer_position = ?", [process_id, transfer_position], DATABASE)
 			# Step 1: sequence started.
 			if started and not(step_stored(1, 1, progress_table)):
 				system.db.runPrepUpdate("INSERT INTO pb_recipes_progress (process_id, transfer_position, step) VALUES (?, ?, ?)", [process_id, transfer_position, 1], DATABASE)
@@ -811,7 +809,7 @@ def check_inventory_completion(prebatch_path):
 							component_units = 0
 							for row_index in range(len(table)):
 								# Field loop.
-								for j in range(1, 5):
+								for j in range(1, 6):
 									current_package_component_id = table[row_index]["c" + ("%02d" % j) + "_id"]
 									if current_package_component_id == current_recipe_component:
 										component_units += table[row_index]["units_total"]
