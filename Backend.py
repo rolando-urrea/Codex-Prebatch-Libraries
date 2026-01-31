@@ -479,28 +479,29 @@ def set_unit_limit(prebatch_path, tank_path):
 					conc_type = system.tag.read(current_base_position_path + "type").value
 					pu_par_path = prebatch_path + "Units/" + process_unit + "/Par/"
 					pu_min_water_volume = 0
-					# First, get the minimum agitation volume for a solid or mixed concentrate.
 					if conc_type == 1 or conc_type == 3:
+						# SOLIDS AND MIXED CONCENTRATES.
 						# Prevent a wrong unit configuration for a solid concentrate (the minAgitationVolume tag must exist in the right unit).
 						unit_min_agitation_volume = system.tag.read(pu_par_path + "minAgitationVolume").value
 						if unit_min_agitation_volume is not None:
 							pu_min_water_volume = unit_min_agitation_volume
-					# Liquids that are not poured into the common tank must be treated differently.
-					pu_cap_path = prebatch_path + "Units/" + process_unit + "/capabilities/"
-					is_bayonet = system.tag.read(pu_cap_path + "bayonet").value
-					is_ibc = system.tag.read(pu_cap_path + "IBC").value
-					is_liquids_tank = system.tag.read(pu_cap_path + "liquidsTank").value
-					if is_bayonet or is_ibc or is_liquids_tank:
-						# Only add the rinse volume to the general sum.
-						rinse_volume = system.tag.read(pu_par_path + "rinseVolume").value
-						calculated_water += rinse_volume
-					else:
-						# Solids and mixed concentrates water requirement is set here.
-						# Compare the calculated water volume with the minimum agitation volume required for the unit.
-						if pu_min_water_volume < calculated_water:
-							pu_min_water_volume = calculated_water
-						# Add both the dissolving water volume and the rinse volume to the general sum.
+							# Compare the calculated water volume with the minimum agitation volume required for the unit.
+							if pu_min_water_volume < calculated_water:
+								pu_min_water_volume = calculated_water
 						calculated_water = pu_min_water_volume + system.tag.read(pu_par_path + "rinseVolume").value
+					else:
+						# LIQUIDS.
+						rinse_volume = system.tag.read(pu_par_path + "rinseVolume").value
+						pu_cap_path = prebatch_path + "Units/" + process_unit + "/capabilities/"
+						is_bayonet = system.tag.read(pu_cap_path + "bayonet").value
+						is_ibc = system.tag.read(pu_cap_path + "IBC").value
+						is_liquids_tank = system.tag.read(pu_cap_path + "liquidsTank").value
+						if is_bayonet or is_ibc or is_liquids_tank:
+							# Only consider the rinse volume.
+							calculated_water = rinse_volume
+						else:
+							# Liquids that are poured into the common tank must consider the initial water load.
+							calculated_water += rinse_volume
 				prebatch_water += calculated_water
 			recipe_water = system.tag.read(recipe_path + "water").value * test_units
 			required_water = tank_agitation_water + sweetener_water + prebatch_water
@@ -578,8 +579,9 @@ def calculate(prebatch_path, tank_path, units):
 				conc_type = system.tag.read(current_base_position_path + "type").value
 				pu_par_path = prebatch_path + "Units/" + process_unit + "/Par/"
 				cycles = 1
-				if conc_type == 1:
-					# Prevent a wrong unit configuration for a solid concentrate (the minAgitationVolume tag must exist in the right unit).
+				if conc_type == 1 or conc_type == 3:
+					# SOLIDS AND MIXED CONCENTRATES.
+					# Prevent a wrong unit configuration for a solid or mixed concentrate (the minAgitationVolume tag must exist in the right unit).
 					pu_min_agitation_volume = system.tag.read(pu_par_path + "minAgitationVolume").value
 					if pu_min_agitation_volume is not None:
 						pu_min_water_volume = pu_min_agitation_volume
@@ -592,10 +594,26 @@ def calculate(prebatch_path, tank_path, units):
 					if pu_capacity is not None:
 						if pu_capacity > 0:
 							cycles = math.ceil(calculated_volume / pu_capacity)
-				if cycles == 0:
-					cycles = 1
-				system.tag.writeBlocking(current_production_position_path + "water", calculated_water / cycles)
-				system.tag.writeBlocking(current_production_position_path + "cycles", cycles)
+					if cycles == 0:
+						cycles = 1
+					system.tag.writeBlocking(current_production_position_path + "water", calculated_water / cycles)
+					system.tag.writeBlocking(current_production_position_path + "cycles", cycles)
+				else:
+					# LIQUIDS.
+					# Liquids that are not poured into the common tank must be treated differently.
+					rinse_volume = system.tag.read(pu_par_path + "rinseVolume").value
+					pu_cap_path = prebatch_path + "Units/" + process_unit + "/capabilities/"
+					is_bayonet = system.tag.read(pu_cap_path + "bayonet").value
+					is_ibc = system.tag.read(pu_cap_path + "IBC").value
+					is_liquids_tank = system.tag.read(pu_cap_path + "liquidsTank").value
+					if is_bayonet or is_ibc or is_liquids_tank:
+						# Set the water volume is the rinse volume.
+						calculated_water = rinse_volume
+					else:
+						# Liquids that are poured into the common tank must consider the initial water load.
+						calculated_water += rinse_volume
+					system.tag.writeBlocking(current_production_position_path + "water", calculated_water)
+					system.tag.writeBlocking(current_production_position_path + "cycles", 1)
 				if LOG_INFO_EVENTS:
 					logger.infof("[%s] calculate() [do]: unit %s found for %s; cycles = %d", prebatch_name, process_unit, components, int(cycles))
 				system.tag.writeBlocking(prebatch_path + "Process/maxPosition", i)
