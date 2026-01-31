@@ -609,9 +609,7 @@ def calculate(prebatch_path, tank_path, units):
 					if is_bayonet or is_ibc or is_liquids_tank:
 						# Set the water volume is the rinse volume.
 						calculated_water = rinse_volume
-					else:
-						# Liquids that are poured into the common tank must consider the initial water load.
-						calculated_water += rinse_volume
+					# Liquids poured directly into the tank must use the calculated water but with no cycles calculation.
 					system.tag.writeBlocking(current_production_position_path + "water", calculated_water)
 					system.tag.writeBlocking(current_production_position_path + "cycles", 1)
 				if LOG_INFO_EVENTS:
