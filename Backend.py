@@ -119,6 +119,7 @@ def clear_production_recipe(recipe_path, prebatch_name):
 	try:
 		# Production recipes have a lot less information than full recipes.
 		# The Execution Plans have all the details about concentrates, so there's no need to perform calculations on the components.
+		system.tag.writeBlocking(recipe_path + "recipeType", 0)
 		system.tag.writeBlocking(recipe_path + "mass", 0)
 		system.tag.writeBlocking(recipe_path + "volume", 0)
 		system.tag.writeBlocking(recipe_path + "sucrose", 0)
@@ -129,6 +130,34 @@ def clear_production_recipe(recipe_path, prebatch_name):
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] clear_production_recipe() [end]", prebatch_name)
+		logger = None
+
+def copy_production_recipe(prebatch_name, source_recipe_path, target_recipe_path):
+	logger = system.util.getLogger(LOGGER_NAME)
+	if LOG_INFO_EVENTS:
+		logger.infof("[%s] copy_production_recipe() [start]", prebatch_name)
+	try:
+		# Production recipes have a lot less information than full recipes.
+		# The Execution Plans have all the details about concentrates, so there's no need to perform calculations on the components.
+		# Load data from the source recipe (doing so is easier to understan).
+		recipe_type = system.tag.read(source_recipe_path + "recipeType").value
+		mass = system.tag.read(source_recipe_path + "mass").value
+		volume = system.tag.read(source_recipe_path + "volume").value
+		sucrose = system.tag.read(source_recipe_path + "sucrose").value
+		fructose = system.tag.read(source_recipe_path + "fructose").value
+		water = system.tag.read(source_recipe_path + "water").value
+		# Transfer the data to the target recipe.
+		system.tag.writeBlocking(target_recipe_path + "recipeType", recipe_type)
+		system.tag.writeBlocking(target_recipe_path + "mass", mass)
+		system.tag.writeBlocking(target_recipe_path + "volume", volume)
+		system.tag.writeBlocking(target_recipe_path + "sucrose", sucrose)
+		system.tag.writeBlocking(target_recipe_path + "fructose", fructose)
+		system.tag.writeBlocking(target_recipe_path + "water", water)
+	except:
+		logger.errorf("[%s] copy_production_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
+	finally:
+		if LOG_INFO_EVENTS:
+			logger.infof("[%s] copy_production_recipe() [end]", prebatch_name)
 		logger = None
 
 def clear_all_recipes(prebatch_path):
@@ -956,6 +985,8 @@ def save_final_data_running_recipe(prebatch_path):
 		logger = None
 
 def main(prebatch_path):
+	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
+	logger = system.util.getLogger(LOGGER_NAME)
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
 	system_alarmed = system.tag.read(prebatch_path + "Process/alarmed").value
 	# Verify there's a correct configuration in the system.
@@ -976,6 +1007,8 @@ def main(prebatch_path):
 							coordinate(prebatch_path)
 					else:
 						system.tag.writeBlocking(prebatch_path + "Process/processing", True)
+						if LOG_INFO_EVENTS:
+							logger.infof("[%s] main() [do]: %s", prebatch_name, "--- SYSTEM STARTED ---")
 						save_process_data(prebatch_path)
 						system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 				else:
@@ -1003,6 +1036,9 @@ def main(prebatch_path):
 								system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 								copy_execution_plan(prebatch_path, prebatch_path + "Process/productionExecutionPlan/",
 													prebatch_path + "Process/OPCProductionExecutionPlan/")
+								copy_production_recipe(prebatch_name, prebatch_path + "Process/productionRecipe/", prebatch_path + "Process/OPCProductionRecipe/")
+								if LOG_INFO_EVENTS:
+									logger.infof("[%s] main() [do]: %s", prebatch_name, "--- SYSTEM READY TO START ---")
 								system.tag.writeBlocking(prebatch_path + "Process/dataTransferred", True)
 								system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 						if calculated_units == user_units:
@@ -1038,6 +1074,7 @@ def main(prebatch_path):
 					clear_all_recipes(prebatch_path)
 					clear_all_execution_plans(prebatch_path)
 					system.tag.writeBlocking(prebatch_path + "Process/processing", False)
+	logger = None
 
 def initialize_module(position):
 	logger = system.util.getLogger(LOGGER_NAME)
