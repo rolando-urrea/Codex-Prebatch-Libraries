@@ -783,13 +783,15 @@ def coordinate(prebatch_path):
 
 def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/start", False)
+	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
 	# system.tag.writeBlocking(prebatch_path + "Process/started", False)
 	system.tag.writeBlocking(prebatch_path + "Process/abort", False)
+	system.tag.writeBlocking(prebatch_path + "Process/reset", False)
+	system.tag.writeBlocking(prebatch_path + "Process/userConfirmation", False)
 	system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", False)
-	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
+	system.tag.writeBlocking(prebatch_path + "Process/dataTransferred", False)
 	system.tag.writeBlocking(prebatch_path + "Process/loaded", False)
 	system.tag.writeBlocking(prebatch_path + "Process/processing", False)
-	system.tag.writeBlocking(prebatch_path + "Process/reset", False)
 	system.tag.writeBlocking(prebatch_path + "Process/processId", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/calculatedUnits", 0)
 	system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngLow", 0)
@@ -989,9 +991,22 @@ def main(prebatch_path):
 						if calculated_units != user_units or calculated_units == 0:
 							system.tag.writeBlocking(prebatch_path + "Process/processing", True)
 							calculate(prebatch_path, tank_path, user_units)
-							# Transfer the execution plan to the processor.
-							copy_execution_plan(prebatch_path, prebatch_path + "Process/productionExecutionPlan/", prebatch_path + "Process/OPCProductionExecutionPlan/")
 							system.tag.writeBlocking(prebatch_path + "Process/processing", False)
+						# Check if the calculated units are the same as the user units and they're greater than zero.
+						# Also wait for user confirmation.
+						if calculated_units == user_units and user_units > 0:
+							user_confirmation = system.tag.read(prebatch_path + "Process/userConfirmation").value
+							data_transferred = system.tag.read(prebatch_path + "Process/dataTransferred").value
+							if user_confirmation and not data_transferred:
+								# Transfer the execution plan to the processor and mark set the Transferred flag to True.
+								# This will stop cyclic data transfer.
+								system.tag.writeBlocking(prebatch_path + "Process/processing", True)
+								copy_execution_plan(prebatch_path, prebatch_path + "Process/productionExecutionPlan/",
+													prebatch_path + "Process/OPCProductionExecutionPlan/")
+								system.tag.writeBlocking(prebatch_path + "Process/dataTransferred", True)
+								system.tag.writeBlocking(prebatch_path + "Process/processing", False)
+						if calculated_units == user_units:
+							system.tag.writeBlocking(prebatch_path + "Process/loaded", True)
 						# Evaluate inventory completion (if it's available).
 						if BARCODE_EVALUATION:
 							check_inventory_completion(prebatch_path)
