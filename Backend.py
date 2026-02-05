@@ -17,6 +17,7 @@ DATABASE = "Process"
 # Process setup.
 POSITION_SLOTS = 16
 PROCESSOR_MANAGED = True
+BATCH_MANAGEMENT = False
 BARCODE_EVALUATION = False
 # Estimation for volume evaluation.
 SWEETENER_DENSITY = 1.30
@@ -25,7 +26,8 @@ FRUCTOSE_SOLIDS = 0.77
 
 def machine_conditions_ready(prebatch_path):
 	# Checks if all the start base conditions are met.
-	# TODO: add external batch management conditions (Prebatch and Tank allocated, as well as the concentrate dosing phases active).
+	# TODO: add external batch conditions (Prebatch and Tank allocated, as well as the concentrate dosing phases active).
+	# TODO: this only applies if there's interaction with a batch system management.
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	# The main condition is there should be only one default unit, assigned to a common tank.
