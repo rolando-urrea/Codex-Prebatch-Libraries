@@ -566,6 +566,7 @@ def calculate(prebatch_path, tank_path, units):
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] calculate() [do]: recipe_id: %s, recipe_name: %s, units: %d", prebatch_name, recipe_id, recipe_name, units)
 		# Update the production recipe.
+		system.tag.writeBlocking(production_recipe_path + "recipeTye", system.tag.read(base_recipe_path + "recipeType").value * units)
 		system.tag.writeBlocking(production_recipe_path + "mass", system.tag.read(base_recipe_path + "mass").value * units)
 		system.tag.writeBlocking(production_recipe_path + "volume", system.tag.read(base_recipe_path + "volume").value * units)
 		system.tag.writeBlocking(production_recipe_path + "water", system.tag.read(base_recipe_path + "water").value * units)
