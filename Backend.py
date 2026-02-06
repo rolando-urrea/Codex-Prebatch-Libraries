@@ -17,7 +17,7 @@ DATABASE = "Process"
 # Process setup.
 POSITION_SLOTS = 16
 PROCESSOR_MANAGED = True
-BATCH_MANAGEMENT = False
+BATCH_LINKED = False
 BARCODE_EVALUATION = False
 # Estimation for volume evaluation.
 SWEETENER_DENSITY = 1.30
@@ -50,7 +50,7 @@ def machine_conditions_ready(prebatch_path):
 	if not default_unit_is_common:
 		logger.errorf("[%s] machine_conditions_ready() [error]: the default unit must have the 'common' capability", prebatch_name)
 	if not default_unit_is_common or not only_one_default_unit:
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	logger = None
 	return default_unit_is_common and only_one_default_unit
 
@@ -251,7 +251,7 @@ def load_recipe(prebatch_path, recipe_id):
 		system.tag.writeBlocking(prebatch_path + "/Process/loaded", True)
 	except:
 		logger.errorf("[%s] load_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] load_recipe() [end]: %s (%s)", prebatch_name, recipe_id, recipe_name)
@@ -457,7 +457,7 @@ def set_base_execution_plan(prebatch_path):
 				first_item = False
 	except:
 		logger.errorf("[%s] set_base_execution_plan() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		if LOG_INFO_EVENTS:
 			recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
@@ -549,7 +549,7 @@ def set_unit_limit(prebatch_path, tank_path):
 		system.tag.writeBlocking(prebatch_path + "Process/userUnits", min_units)
 	except:
 		logger.errorf("[%s] set_unit_limit() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] set_unit_limit() for %s [end]", prebatch_name, recipe_name)
@@ -571,7 +571,7 @@ def calculate(prebatch_path, tank_path, units):
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] calculate() [do]: recipe_id: %s, recipe_name: %s, units: %d", prebatch_name, recipe_id, recipe_name, units)
 		# Update the production recipe.
-		system.tag.writeBlocking(production_recipe_path + "recipeTye", system.tag.read(base_recipe_path + "recipeType").value * units)
+		system.tag.writeBlocking(production_recipe_path + "recipeType", system.tag.read(base_recipe_path + "recipeType").value)
 		system.tag.writeBlocking(production_recipe_path + "mass", system.tag.read(base_recipe_path + "mass").value * units)
 		system.tag.writeBlocking(production_recipe_path + "volume", system.tag.read(base_recipe_path + "volume").value * units)
 		system.tag.writeBlocking(production_recipe_path + "water", system.tag.read(base_recipe_path + "water").value * units)
@@ -654,7 +654,7 @@ def calculate(prebatch_path, tank_path, units):
 		system.tag.writeBlocking(prebatch_path + "Process/calculatedUnits", units)
 	except:
 		logger.errorf("[%s] calculate() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] calculate() [end]", prebatch_name)
@@ -708,7 +708,7 @@ def save_process_data(prebatch_path):
 		system.tag.write(prebatch_path + "Process/processId", process_id)
 	except:
 		logger.errorf("[%s] save_process_data() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] save_process_data() [do]: recipe_id: %s, recipe_name: %s, process_id: %d", prebatch_name, recipe_id, recipe_name, process_id)
@@ -765,7 +765,7 @@ def coordinate_solids_unit(prebatch_path, pu_path):
 					logger.infof("[%s] coordinate_solids_unit [do]: update TRANSFERRED status for %s (%s) [%.2f L]", prebatch_name, pu_name, components, rinse_accum)
 	except:
 		logger.errorf("[%s] coordinate_solids_unit() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		logger = None
 
@@ -796,7 +796,7 @@ def coordinate_liquids_unit(prebatch_path, pu_path):
 				logger.infof("[%s] coordinate_liquids_unit [do]: update TRANSFERRED status for %s (%s) [%.2f L]", prebatch_name, pu_name, components, rinse_accum)
 	except:
 		logger.errorf("[%s] coordinate_liquids_unit() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		logger = None
 
@@ -910,7 +910,7 @@ def check_inventory_completion(prebatch_path):
 	except:
 		prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 		logger.errorf("[%s] check_inventory_completion() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		logger = None
 
@@ -945,7 +945,7 @@ def save_inventory(prebatch_path):
 		system.db.runPrepUpdate("DELETE FROM pb_inventory_capture WHERE prebatch = 1", [], DATABASE)
 	except:
 		logger.errorf("[%s] save_inventory() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] store_inventory() [end]", prebatch_name)
@@ -965,7 +965,7 @@ def cancel_running_recipe(prebatch_path):
 			system.db.runPrepUpdate("INSERT INTO pb_recipes_canceled (process_id) VALUES (?)", [process_id], DATABASE)
 	except:
 		logger.errorf("[%s] cancel_running_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] cancel_running_recipe() [end]", prebatch_name)
@@ -992,7 +992,7 @@ def save_final_data(prebatch_path):
 		logger.infof("[%s] save_final_data() [do]: recipeId: %s, recipeName: %s, processId: %d", prebatch_name, recipe_id, recipe_name, process_id)
 	except:
 		logger.errorf("[%s] save_final_data() [error]: %s", prebatch_name, str(sys.exc_info()))
-		system.tag.writeBlocking(prebatch_path + "/Process/alarmed", True)
+		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
 		if LOG_INFO_EVENTS:
 			logger.infof("[%s] save_final_data() [end]", prebatch_name)
@@ -1002,7 +1002,7 @@ def main(prebatch_path):
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
-	system_alarmed = system.tag.read(prebatch_path + "Process/alarmed").value
+	system_alarmed = system.tag.read(prebatch_path + "Process/backendAlarmed").value
 	# Verify there's a correct configuration in the system.
 	if not system_alarmed:
 		if machine_conditions_ready(prebatch_path):
