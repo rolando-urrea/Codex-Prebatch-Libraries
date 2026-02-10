@@ -1011,10 +1011,10 @@ def main(prebatch_path):
 			# First, check the PLC is online.
 			if started_tag.quality.isGood:
 				started = started_tag.value
+				process_id = system.tag.read(prebatch_path + "Process/processId").value
 				if started:
 					# The process was started, which means all the requirements were met. If there's no process id, assign a new one.
 					# Otherwise, keep coordinating the sequences.
-					process_id = system.tag.read(prebatch_path + "Process/processId").value
 					if process_id != 0:
 						concentrate_transferred = system.tag.read(prebatch_path + "Process/concentrateTransferred").value
 						if not concentrate_transferred:
@@ -1077,12 +1077,14 @@ def main(prebatch_path):
 				reset = system.tag.read(prebatch_path + "Process/reset").value
 				if aborted or finalized or reset:
 					system.tag.writeBlocking(prebatch_path + "Process/processing", True)
-					if aborted:
-						cancel_running_recipe(prebatch_path)
-					if aborted or finalized:
-						if BARCODE_EVALUATION:
-							save_inventory(prebatch_path)
-						save_final_data(prebatch_path)
+					# Sometimes a few flags can be on when initializing the system.
+					if process_id > 0:
+						if aborted:
+							cancel_running_recipe(prebatch_path)
+						if aborted or finalized:
+							if BARCODE_EVALUATION:
+								save_inventory(prebatch_path)
+							save_final_data(prebatch_path)
 					initialize_flags(prebatch_path)
 					initialize_inventory_flags(prebatch_path)
 					clear_all_recipes(prebatch_path)
