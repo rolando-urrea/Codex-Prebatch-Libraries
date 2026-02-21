@@ -978,18 +978,23 @@ def save_final_data(prebatch_path):
 		logger.infof("[%S] save_final_data() [start]", prebatch_name)
 	try:
 		process_id = system.tag.read(prebatch_path + "Process/processId").value
-		tank = system.tag.read(prebatch_path + "Process/tank").value
-		tank_accum_path = "[default]Production/SyrupRoom/Tanks/FinishedSyrup/T" + ("%02d" % tank) + "/Accum/"
 		recipe_id = system.tag.read(prebatch_path + "Process/baseRecipe/recipeId").value
 		recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
-		water = system.tag.read(tank_accum_path + "water").value
-		sucrose = system.tag.read(tank_accum_path + "sucrose").value
-		fructose = system.tag.read(tank_accum_path + "fructose").value
-		# Prevent double insertion.
-		stored_process_id = system.db.runScalarPrepQuery("SELECT process_id FROM finished_syrup_tanks_data WHERE process_id = ?", [process_id], DATABASE)
-		if stored_process_id is None:
-			system.db.runPrepUpdate("INSERT INTO finished_syrup_tanks_data (process_id, tank_id, sucrose, fructose, water) VALUES (?, ?, ?, ?, ?)", [process_id, tank, sucrose, fructose, water], DATABASE)
-		logger.infof("[%s] save_final_data() [do]: recipeId: %s, recipeName: %s, processId: %d", prebatch_name, recipe_id, recipe_name, process_id)
+		tank = system.tag.read(prebatch_path + "Process/tank").value
+		# In the case the process was canceled, there's a chance the tank was set to zero already.
+		# If this is the case
+		if tank > 0:
+			tank_accum_path = "[default]Production/SyrupRoom/Tanks/FinishedSyrup/T" + ("%02d" % tank) + "/Accum/"
+			water = system.tag.read(tank_accum_path + "water").value
+			sucrose = system.tag.read(tank_accum_path + "sucrose").value
+			fructose = system.tag.read(tank_accum_path + "fructose").value
+			# Prevent double insertion.
+			stored_process_id = system.db.runScalarPrepQuery("SELECT process_id FROM finished_syrup_tanks_data WHERE process_id = ?", [process_id], DATABASE)
+			if stored_process_id is None:
+				system.db.runPrepUpdate("INSERT INTO finished_syrup_tanks_data (process_id, tank_id, sucrose, fructose, water) VALUES (?, ?, ?, ?, ?)", [process_id, tank, sucrose, fructose, water], DATABASE)
+			logger.infof("[%s] save_final_data() [do]: recipeId: %s, recipeName: %s, processId: %d", prebatch_name, recipe_id, recipe_name, process_id)
+		else:
+			logger.infof("[%s] save_final_data() [do]: recipeId: %s, recipeName: %s, processId: %d; the tank was already initialized (caused by a canceled process)", prebatch_name, recipe_id, recipe_name, process_id)
 	except:
 		logger.errorf("[%s] save_final_data() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
