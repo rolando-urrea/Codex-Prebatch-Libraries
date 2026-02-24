@@ -17,7 +17,6 @@ DATABASE = "Process"
 # Process setup.
 POSITION_SLOTS = 16
 PROCESSOR_MANAGED = True
-BATCH_LINKED = False
 BARCODE_EVALUATION = False
 # Estimation for volume evaluation.
 SWEETENER_DENSITY = 1.30
