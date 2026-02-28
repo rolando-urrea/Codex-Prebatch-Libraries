@@ -544,11 +544,15 @@ def set_unit_limit(prebatch_path, tank_path):
 		if min_units < 1:
 			min_units = 1
 		logger.infof("[%s] set_unit_limit() [do]: min_units: %d, volume: %.2f L", prebatch_name, min_units, recipe_volume * min_units)
-		# To force the unit limit, the userUnits tag has to be set to Engineering Limit Mode Clamp_Both.
 		system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngLow", min_units)
 		system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngHigh", max_units)
 		if LIMIT_UNIT_SELECTION:
+			# Set the Engineering Limit Mode to Clamp_Both (3).
+			system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngLimitMode", 3)
 			system.tag.writeBlocking(prebatch_path + "Process/userUnits", min_units)
+		else:
+			# Set the Engineering Limit Mode to No_Clamp (0).
+			system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngLimitMode", 0)
 	except:
 		logger.errorf("[%s] set_unit_limit() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
