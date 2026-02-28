@@ -18,6 +18,7 @@ DATABASE = "Process"
 POSITION_SLOTS = 16
 PROCESSOR_MANAGED = True
 BARCODE_EVALUATION = False
+LIMIT_UNIT_SELECTION = False
 # Estimation for volume evaluation.
 SWEETENER_DENSITY = 1.30
 SIMPLE_SYRUP_BRIX = 0.60
@@ -543,9 +544,11 @@ def set_unit_limit(prebatch_path, tank_path):
 		if min_units < 1:
 			min_units = 1
 		logger.infof("[%s] set_unit_limit() [do]: min_units: %d, volume: %.2f L", prebatch_name, min_units, recipe_volume * min_units)
+		# To force the unit limit, the userUnits tag has to be set to Engineering Limit Mode Clamp_Both.
 		system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngLow", min_units)
 		system.tag.writeBlocking(prebatch_path + "Process/userUnits.EngHigh", max_units)
-		system.tag.writeBlocking(prebatch_path + "Process/userUnits", min_units)
+		if LIMIT_UNIT_SELECTION:
+			system.tag.writeBlocking(prebatch_path + "Process/userUnits", min_units)
 	except:
 		logger.errorf("[%s] set_unit_limit() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
