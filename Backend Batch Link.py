@@ -1,5 +1,5 @@
-# Prebatch Backend Batch Link function library v2.0.0 ALPHA.
-# This set of functions allow the interaction between the Ignition Backend and Batch Management.
+# Prebatch Backend Batch Link function library v2.0.0 BETA.
+# This set of functions allows the interaction between the Ignition Backend and Batch Management.
 # To be used on Inductive Automation's Ignition platform.
 #
 # Rolando Urrea.

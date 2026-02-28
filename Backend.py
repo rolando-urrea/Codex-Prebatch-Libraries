@@ -1,4 +1,4 @@
-# Prebatch Backend function library v2.0.0 ALPHA.
+# Prebatch Backend function library v2.0.0 BETA.
 # To be used on Inductive Automation's Ignition platform.
 #
 # Rolando Urrea.
