@@ -1100,6 +1100,8 @@ def main(prebatch_path):
 					initialize_inventory_flags(prebatch_path)
 					clear_all_recipes(prebatch_path)
 					clear_all_execution_plans(prebatch_path)
+					if LOG_INFO_EVENTS:
+						logger.infof("[%s] main() [do]: %s", prebatch_name, "--- SYSTEM FINISHED ---")
 					system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 	logger = None
 
