@@ -190,7 +190,6 @@ def load_recipe(prebatch_path, recipe_id):
 		logger.infof("[%s] load_recipe() [start]: %s", prebatch_name, recipe_id)
 	recipe_name = ""
 	try:
-		recipe_table = None
 		recipe_table = system.db.runPrepQuery("SELECT * FROM pb_recipes_current_full WHERE recipe_id = ?", [recipe_id], DATABASE)
 		# In case there's no recipe reference in the database, write the error to the logger and clear the recipe.
 		if len(recipe_table) == 0:
@@ -219,7 +218,6 @@ def load_recipe(prebatch_path, recipe_id):
 			for i in range (1, POSITION_SLOTS + 1):
 				component_path = recipe_path + "Components/c" + str("%02d" % i) + "/"
 				# Get the component's details.
-				component_table = None
 				component_table = system.db.runPrepQuery("SELECT * FROM pb_components_current WHERE component_id = ?", [recipe_data_row["c" + str("%02d" % i) + "_id"]], DATABASE)
 				# In case there's no component reference in the database, initialize its position.
 				if len(component_table) == 0:
