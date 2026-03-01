@@ -26,8 +26,6 @@ FRUCTOSE_SOLIDS = 0.77
 
 def machine_conditions_ready(prebatch_path):
 	# Checks if all the start base conditions are met.
-	# TODO: add external batch conditions (Prebatch and Tank allocated, as well as the concentrate dosing phases active).
-	# TODO: this only applies if there's interaction with a batch system management.
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	# The main condition is there should be only one default unit, assigned to a common tank.
