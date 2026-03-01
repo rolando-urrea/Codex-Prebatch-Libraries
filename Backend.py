@@ -599,8 +599,6 @@ def calculate(prebatch_path, tank_path, units):
 			# Define the current positions' paths.
 			current_base_position_path = prebatch_path + "Process/baseExecutionPlan/Positions/p" + ("%02d" % i) + "/"
 			current_production_position_path = prebatch_path + "Process/productionExecutionPlan/Positions/p" + ("%02d" % i) + "/"
-			# Initialize the number of instances for this calculated position.
-			position_instances = 1
 			# Load evaluation data.
 			process_unit = system.tag.read(current_base_position_path + "processUnit").value
 			# Empty slots will have the Process Unit tag equal to "".
@@ -926,7 +924,7 @@ def save_inventory(prebatch_path):
 		# Transfers the records from the capture table to the history one.
 		process_id = system.tag.read(prebatch_path + "Process/processId").value
 		capture_table = system.db.runPrepQuery("SELECT * FROM pb_inventory_capture WHERE prebatch = ?", [prebatch_number], DATABASE)
-		tx_id = system.db.beginTransaction(DATABASE, timeout = 5000)
+		tx_id = system.db.beginTransaction(DATABASE, timeout=5000)
 		for row_index in range(len(capture_table)):
 			local_row = capture_table[row_index]
 			# Update history.
