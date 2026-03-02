@@ -67,6 +67,9 @@ def main(prebatch_path):
 										if LOG_INFO_EVENTS:
 											logger.infof("[%s] main() [do]: Batch Management Link: units set: %d", prebatch_name, batch_units)
 					else:
-						# Initialize the tank selection.
-						system.tag.writeBlocking(prebatch_path + "Process/tank", 0)
+						# Check if the tank was already initialized; otherwise, clear the Batch folder variables and initialize the local tank.
+						if backend_tank != 0:
+							system.tag.writeBlocking(prebatch_path + "Process/tank", 0)
+							system.tag.writeBlocking(prebatch_path + "Process/Batch/recipeId", "")
+							system.tag.writeBlocking(prebatch_path + "Process/Batch/stringUnits", "")
 	logger = None
