@@ -1,4 +1,4 @@
-# Prebatch Backend Batch Link function library v2.0.0 BETA.
+# Prebatch Backend Batch Management Link function library v2.0.0 BETA.
 # This set of functions allows the interaction between the Ignition Backend and Batch Management.
 # To be used on Inductive Automation's Ignition platform.
 #
@@ -27,7 +27,7 @@ def main(prebatch_path):
 		if len(batch_recipe_id) > 2:
 			recipe_name = system.db.runScalarPrepQuery("SELECT recipe_name FROM pb_recipes_current_basic WHERE recipe_id = ?", [batch_recipe_id], DATABASE)
 			if recipe_name is None:
-				logger.errorf("[%s] main() [error]: Batch Management Link: Recipe not found: %s", prebatch_name, batch_recipe_id)
+				logger.errorf("[%s] main() [error]: Batch Management Link: recipe not found: %s", prebatch_name, batch_recipe_id)
 				system.tag.writeBlocking(prebatch_path + "Process/backendAlarmed", True)
 			else:
 				# Keep evaluating.
@@ -44,9 +44,9 @@ def main(prebatch_path):
 							if tank_name is not None:
 								system.tag.writeBlocking(prebatch_path + "Process/tank", batch_tank)
 								if LOG_INFO_EVENTS:
-									logger.infof("[%s] main() [do]: Batch Management Link: Tank selected: %s", prebatch_name, tank_name)
+									logger.infof("[%s] main() [do]: Batch Management Link: tank selected: %s", prebatch_name, tank_name)
 							else:
-								logger.errorf("[%s] main() [error]: Batch Management Link: Tank not found: %d", prebatch_name, batch_tank)
+								logger.errorf("[%s] main() [error]: Batch Management Link: tank not found: %d", prebatch_name, batch_tank)
 								system.tag.writeBlocking(prebatch_path + "Process/backendAlarmed", True)
 						else:
 							# Wait for the recipe selection.
@@ -57,7 +57,7 @@ def main(prebatch_path):
 									# A recipe was selected in the Batch Management System.
 									system.tag.writeBlocking(prebatch_path + "Process/baseRecipe/recipeId", batch_recipe_id)
 									if LOG_INFO_EVENTS:
-										logger.infof("[%s] main() [do]: Batch Management Link: Recipe selected: %s", prebatch_name, recipe_name)
+										logger.infof("[%s] main() [do]: Batch Management Link: recipe selected: %s", prebatch_name, recipe_name)
 								else:
 									# Evaluate the unit selection.
 									batch_units = system.tag.read(prebatch_path + "Process/Batch/numericUnits").value
@@ -65,7 +65,7 @@ def main(prebatch_path):
 									if batch_units != backend_units:
 										system.tag.writeBlocking(prebatch_path + "Process/userUnits", batch_units)
 										if LOG_INFO_EVENTS:
-											logger.infof("[%s] main() [do]: Batch Management Link: Units set: %d", prebatch_name, batch_units)
+											logger.infof("[%s] main() [do]: Batch Management Link: units set: %d", prebatch_name, batch_units)
 					else:
 						# Initialize the tank selection.
 						system.tag.writeBlocking(prebatch_path + "Process/tank", 0)
