@@ -11,6 +11,8 @@
 # General.
 LOG_INFO_EVENTS = True
 LOGGER_NAME = "CodexPrebatchBatchLinkBackend"
+# Software database specifications.
+DATABASE = "Process"
 
 def main(prebatch_path):
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
@@ -27,9 +29,15 @@ def main(prebatch_path):
 				# Compare the Batch tank selection against the Backend.
 				if batch_tank != backend_tank:
 					# A tank has been selected in the Batch Management System.
-					system.tag.writeBlocking(prebatch_path + "Process/tank", batch_tank)
-					if LOG_INFO_EVENTS:
-						logger.infof("[%s] main() [do]: %s", prebatch_name, "--- BATCH MANAGEMENT: TANK SELECTED ---")
+					# Check if the tank is valid.
+					tank_name = system.db.runScalarPrepQuery("SELECT tank_name FROM finished_syrup_tanks WHERE tank_id = ?", [batch_tank], DATABASE)
+					if tank_name is not None:
+						system.tag.writeBlocking(prebatch_path + "Process/tank", batch_tank)
+						if LOG_INFO_EVENTS:
+							logger.infof("[%s] main() [do]: --- BATCH MANAGEMENT: TANK SELECTED: %s ---", prebatch_name, tank_name)
+					else:
+						logger.errorf("[%s] main() [error]: --- BATCH MANAGEMENT: TANK NOT FOUND: %d ---", prebatch_name, batch_tank)
+						system.tag.writeBlocking(prebatch_path + "Process/backendAlarmed", True)
 				else:
 					# Wait for the recipe selection.
 					batch_recipe_id = system.tag.read(prebatch_path + "Process/Batch/recipeId").value
@@ -37,9 +45,15 @@ def main(prebatch_path):
 						backend_recipe_id = system.tag.read(prebatch_path + "Process/baseRecipe/recipeId").value
 						if backend_recipe_id != batch_recipe_id:
 							# A recipe was selected in the Batch Management System.
-							system.tag.writeBlocking(prebatch_path + "Process/baseRecipe/recipeId", batch_recipe_id)
-							if LOG_INFO_EVENTS:
-								logger.infof("[%s] main() [do]: %s", prebatch_name, "--- BATCH MANAGEMENT: RECIPE SELECTED ---")
+							# Check if the recipe is valid.
+							recipe_name = system.db.runScalarPrepQuery("SELECT recipe_name FROM pb_recipes_current_basic WHERE recipe_id = ?", [batch_recipe_id], DATABASE)
+							if recipe_name is not None:
+								system.tag.writeBlocking(prebatch_path + "Process/baseRecipe/recipeId", batch_recipe_id)
+								if LOG_INFO_EVENTS:
+									logger.infof("[%s] main() [do]: --- BATCH MANAGEMENT: RECIPE SELECTED: %s ---", prebatch_name, recipe_name)
+							else:
+								logger.errorf("[%s] main() [error]: --- BATCH MANAGEMENT: RECIPE NOT FOUND: %s ---", prebatch_name, batch_recipe_id)
+								system.tag.writeBlocking(prebatch_path + "Process/backendAlarmed", True)
 						else:
 							# Evaluate the unit selection.
 							batch_units = system.tag.read(prebatch_path + "Process/Batch/numericUnits").value
@@ -47,5 +61,5 @@ def main(prebatch_path):
 							if batch_units != backend_units:
 								system.tag.writeBlocking(prebatch_path + "Process/userUnits", batch_units)
 								if LOG_INFO_EVENTS:
-									logger.infof("[%s] main() [do]: %s", prebatch_name, "--- BATCH MANAGEMENT: UNITS SET ---")
+									logger.infof("[%s] main() [do]: --- BATCH MANAGEMENT: UNITS SET: %d ---", prebatch_name, batch_units)
 	logger = None
