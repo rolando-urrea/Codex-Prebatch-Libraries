@@ -24,8 +24,12 @@ SWEETENER_DENSITY = 1.30
 SIMPLE_SYRUP_BRIX = 0.60
 FRUCTOSE_SOLIDS = 0.77
 
-def machine_conditions_ready(prebatch_path):
-	# Checks if all the start base conditions are met.
+def machine_conditions_ready(prebatch_path) -> bool:
+	"""
+	Checks if all the start base conditions are met.
+	:param prebatch_path: Prebatch tag path.
+	:return: True if all conditions are met, False otherwise.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	# The main condition is there should be only one default unit, assigned to a common tank.
