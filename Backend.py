@@ -1099,6 +1099,9 @@ def main(prebatch_path):
 							if BARCODE_EVALUATION:
 								save_inventory(prebatch_path)
 							save_final_data(prebatch_path)
+					if finalized:
+						if LOG_INFO_EVENTS:
+							logger.infof("[%s] main() [do]: finalizing", prebatch_name)
 					initialize_flags(prebatch_path)
 					initialize_inventory_flags(prebatch_path)
 					clear_all_recipes(prebatch_path)
