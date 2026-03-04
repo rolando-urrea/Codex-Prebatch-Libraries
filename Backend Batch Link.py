@@ -14,7 +14,12 @@ LOGGER_NAME = "CodexPrebatchBatchLinkBackend"
 # Software database specifications.
 DATABASE = "Process"
 
-def main(prebatch_path):
+def main(prebatch_path) -> None:
+	"""
+	Backend Batch Link main function.
+	:param prebatch_path: Prebatch tag path.
+	:return: None
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
