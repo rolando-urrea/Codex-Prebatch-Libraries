@@ -24,7 +24,7 @@ SWEETENER_DENSITY = 1.30
 SIMPLE_SYRUP_BRIX = 0.60
 FRUCTOSE_SOLIDS = 0.77
 
-def machine_conditions_ready(prebatch_path) -> bool:
+def machine_conditions_ready(prebatch_path):
 	"""
 	Checks if all the start base conditions are met.
 	:param prebatch_path: Prebatch tag path.
@@ -57,6 +57,11 @@ def machine_conditions_ready(prebatch_path) -> bool:
 	return default_unit_is_common and only_one_default_unit
 
 def clear_component(component_path):
+	"""
+	Initializes one specific component from an Execution Plan.
+	:param component_path: Component's path.
+	:return: None.
+	"""
 	# Don't consider this function in the logger's scope; it would produce too much detail.
 	system.tag.writeBlocking(component_path + "componentId", "")
 	system.tag.writeBlocking(component_path + "componentName", "")
