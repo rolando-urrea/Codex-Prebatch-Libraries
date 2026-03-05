@@ -100,6 +100,12 @@ def clear_all_components(recipe_path, prebatch_name):
 	logger = None
 
 def clear_full_recipe(recipe_path, prebatch_name):
+	"""
+	Clears all the fields in the full recipe. A full recipe includes all the information about the components.
+	:param recipe_path: Recipe's path.
+	:param prebatch_name: Prebatch's name for logging purposes.
+	:return: None.
+	"""
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] clear_full_recipe() [start]", prebatch_name)
@@ -128,6 +134,12 @@ def clear_full_recipe(recipe_path, prebatch_name):
 		logger = None
 
 def clear_production_recipe(recipe_path, prebatch_name):
+	"""
+	Clears all the fields in the production recipe. A production recipe has less information than a full recipe (no components).
+	:param recipe_path: Recipe's path.
+	:param prebatch_name: Prebatch's name for logging purposes.
+	:return: None.
+	"""
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] clear_production_recipe() [start]", prebatch_name)
@@ -148,13 +160,20 @@ def clear_production_recipe(recipe_path, prebatch_name):
 		logger = None
 
 def copy_production_recipe(prebatch_name, source_recipe_path, target_recipe_path):
+	"""
+	Copies a production recipe.
+	:param prebatch_name: Prebatch's name for logging purposes.
+	:param source_recipe_path: Source production recipe's path.
+	:param target_recipe_path: Target production recipe's path.
+	:return: None.
+	"""
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] copy_production_recipe() [start]", prebatch_name)
 	try:
 		# Production recipes have a lot less information than full recipes.
 		# The Execution Plans have all the details about concentrates, so there's no need to perform calculations on the components.
-		# Load data from the source recipe (doing so is easier to understan).
+		# Load data from the source recipe (doing so is easier to understand).
 		recipe_type = system.tag.read(source_recipe_path + "recipeType").value
 		mass = system.tag.read(source_recipe_path + "mass").value
 		volume = system.tag.read(source_recipe_path + "volume").value
@@ -176,6 +195,11 @@ def copy_production_recipe(prebatch_name, source_recipe_path, target_recipe_path
 		logger = None
 
 def clear_all_recipes(prebatch_path):
+	"""
+	Clears all the recipes in the Prebatch, including base and production recipes.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
@@ -199,6 +223,12 @@ def clear_all_recipes(prebatch_path):
 	logger = None
 
 def load_recipe(prebatch_path, recipe_id):
+	"""
+	Loads a recipe from the database and populates the Prebatch with the data.
+	:param prebatch_path: Prebatch's path.
+	:param recipe_id: Recipe's ID.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
@@ -269,6 +299,11 @@ def load_recipe(prebatch_path, recipe_id):
 		logger = None
 
 def clear_execution_position(position_path):
+	"""
+	Clears all the fields in the execution position.
+	:param position_path: Execution position's path.
+	:return: None.
+	"""
 	# Don't consider this function in the logger's scope; it would produce too much detail.
 	system.tag.writeBlocking(position_path + "agitationAutomatic", False)
 	system.tag.writeBlocking(position_path + "agitationDuration", 0)
@@ -288,6 +323,11 @@ def clear_execution_position(position_path):
 	system.tag.writeBlocking(position_path + "water", 0)
 
 def clear_all_execution_plans(prebatch_path):
+	"""
+	Clears all the execution plans in the Prebatch.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	executions_plans = ["baseExecutionPlan", "productionExecutionPlan", "OPCProductionExecutionPlan"]
 	logger = system.util.getLogger(LOGGER_NAME)
@@ -304,6 +344,13 @@ def clear_all_execution_plans(prebatch_path):
 	logger = None
 
 def copy_execution_position(source_position_path, target_position_path, cycles):
+	"""
+	Copies an execution position.
+	:param source_position_path: Source execution position's path.
+	:param target_position_path: Target execution position's path.
+	:param cycles: Number of cycles to copy.
+	:return: None.
+	"""
 	# Don't consider this function in the logger's scope; it would produce too much detail.
 	system.tag.writeBlocking(target_position_path + "agitationAutomatic", system.tag.read(source_position_path + "agitationAutomatic").value)
 	system.tag.writeBlocking(target_position_path + "agitationDuration", system.tag.read(source_position_path + "agitationDuration").value)
@@ -322,6 +369,13 @@ def copy_execution_position(source_position_path, target_position_path, cycles):
 	system.tag.writeBlocking(target_position_path + "cycles", cycles)
 
 def copy_execution_plan(prebatch_path, source_execution_plan_path, target_execution_plan_path):
+	"""
+	Copies an execution plan. This is used to transfer data from the memory execution plan to the OPC one.
+	:param prebatch_path: Prebatch's path.
+	:param source_execution_plan_path: Source execution plan's path.
+	:param target_execution_plan_path: Target execution plan's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
@@ -341,6 +395,11 @@ def copy_execution_plan(prebatch_path, source_execution_plan_path, target_execut
 	logger = None
 
 def get_default_unit(prebatch_path):
+	"""
+	Gets the default unit for the Prebatch.
+	:param prebatch_path: Prebatch's path.
+	:return: Default unit's name.
+	"""
 	# Don't consider this function in the logger's scope; it would produce too much detail.
 	return_value = ""
 	units_path = prebatch_path + "Units/"
@@ -351,6 +410,12 @@ def get_default_unit(prebatch_path):
 	return return_value
 
 def get_unit_from_capability(prebatch_path, capability):
+	"""
+	Gets the unit from a capability.
+	:param prebatch_path: Prebatch's path.
+	:param capability: Capability's name.
+	:return: Unit's name.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	# Don't consider this function in the logger's scope; it would produce too much detail.
 	# If there's no unit with this capability, return the default unit.
@@ -369,6 +434,11 @@ def get_unit_from_capability(prebatch_path, capability):
 	return return_value
 
 def set_base_execution_plan(prebatch_path):
+	"""
+	Sets the Base Execution Plan for the Prebatch. It gets a recipe and processes it according to the Mixing Document.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	# The Base Execution Plan is performed only for unit limit evaluation.
 	# The Production Execution Plan will do water estimation calculations and component partitioning.
@@ -476,6 +546,12 @@ def set_base_execution_plan(prebatch_path):
 		logger = None
 
 def set_unit_limit(prebatch_path, tank_path):
+	"""
+	Sets the unit limit for a recipe/tank combination.
+	:param prebatch_path: Prebatch's path.
+	:param tank_path: Tank's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	# Define the unit limit for this recipe/tank combination.
 	logger = system.util.getLogger(LOGGER_NAME)
@@ -573,6 +649,13 @@ def set_unit_limit(prebatch_path, tank_path):
 		logger = None
 
 def calculate(prebatch_path, tank_path, units):
+	"""
+	Calculates the recipe's units based on the tank's and prebatch's properties.
+	:param prebatch_path: Prebatch's path.
+	:param tank_path: Tank's path.
+	:param units: Number of units to calculate.
+	:return: None.
+	"""
 	import math
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
@@ -676,6 +759,11 @@ def calculate(prebatch_path, tank_path, units):
 		logger = None
 
 def save_process_data(prebatch_path):
+	"""
+	Saves the process data to the database, including: recipe, tank, units, and the elements' versions.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
@@ -731,6 +819,13 @@ def save_process_data(prebatch_path):
 		logger = None
 
 def step_stored(step, cycle, progress_table):
+	"""
+	Checks if a step and cycle are stored in the progress table.
+	:param step: Step number.
+	:param cycle: Cycle number.
+	:param progress_table: Progress table.
+	:return: True if the step and cycle are stored, False otherwise.
+	"""
 	result = False
 	for row_index in range(len(progress_table)):
 		if step == progress_table[row_index]["step"] and cycle == progress_table[row_index]["cycle"]:
@@ -738,6 +833,12 @@ def step_stored(step, cycle, progress_table):
 	return result
 
 def coordinate_solids_unit(prebatch_path, pu_path):
+	"""
+	Coordinates the solids unit by checking the unit's step and then storing the current unit state.
+	:param prebatch_path: Prebatch's path.
+	:param pu_path: Solids Unit's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	process_id = system.tag.read(prebatch_path + "Process/processId").value
 	logger = system.util.getLogger(LOGGER_NAME)
@@ -785,6 +886,12 @@ def coordinate_solids_unit(prebatch_path, pu_path):
 		logger = None
 
 def coordinate_liquids_unit(prebatch_path, pu_path):
+	"""
+	Coordinates the liquids unit by checking the unit's step and then storing the current unit state.
+	:param prebatch_path: Prebatch's path.
+	:param pu_path: Liquids Unit's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	process_id = system.tag.read(prebatch_path + "Process/processId").value
 	logger = system.util.getLogger(LOGGER_NAME)
@@ -816,6 +923,11 @@ def coordinate_liquids_unit(prebatch_path, pu_path):
 		logger = None
 
 def coordinate(prebatch_path):
+	"""
+	Coordinates the units by iterating through the units and calling the appropriate coordinate function..
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	units_path = prebatch_path + "Units/"
 	units = system.tag.browse(path=units_path, recursive=False)
 	for unit in units:
@@ -836,6 +948,11 @@ def coordinate(prebatch_path):
 			system.tag.writeBlocking(prebatch_path + "Process/concentrateTransferred", True)
 
 def initialize_flags(prebatch_path):
+	"""
+	Initializes the flags for the Prebatch.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	system.tag.writeBlocking(prebatch_path + "Process/start", False)
 	system.tag.writeBlocking(prebatch_path + "Process/finalize", False)
 	# system.tag.writeBlocking(prebatch_path + "Process/started", False)
@@ -858,6 +975,11 @@ def initialize_flags(prebatch_path):
 	system.tag.writeBlocking(prebatch_path + "Process/userName", "-")
 
 def initialize_inventory_flags(prebatch_path):
+	"""
+	Initializes the flags for the Inventory.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	inventory_path = prebatch_path + "Process/Inventory/"
 	system.tag.writeBlocking(inventory_path + "correct", False)
 	system.tag.writeBlocking(inventory_path + "currentBarcodeIsCorrect", False)
@@ -865,6 +987,12 @@ def initialize_inventory_flags(prebatch_path):
 	system.tag.writeBlocking(inventory_path + "wrongCodesExist", False)
 
 def module_available(prebatch_path, transfer_position):
+	"""
+	Checks if a module is available at the given transfer position.
+	:param prebatch_path: Prebatch's path.
+	:param transfer_position: Transfer position to check.
+	:return: True if no module is available at the position, False otherwise.
+	"""
 	units_path = prebatch_path + "Units/"
 	units = system.tag.browse(path=units_path, recursive=False)
 	result = True
@@ -874,6 +1002,11 @@ def module_available(prebatch_path, transfer_position):
 	return result
 
 def check_inventory_completion(prebatch_path):
+	"""
+	Checks if the inventory is complete for the given Prebatch.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	logger = system.util.getLogger(LOGGER_NAME)
 	try:
 		# Check if barcode validation is active.
@@ -930,6 +1063,11 @@ def check_inventory_completion(prebatch_path):
 		logger = None
 
 def save_inventory(prebatch_path):
+	"""
+	Saves the concentrate inventory for the given Prebatch.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	logger = system.util.getLogger(LOGGER_NAME)
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	prebatch_number = system.tag.read(prebatch_path + "Process/prebatchNumber").value
@@ -967,6 +1105,11 @@ def save_inventory(prebatch_path):
 		logger = None
 
 def cancel_running_recipe(prebatch_path):
+	"""
+	Cancels the running recipe if the user decides to do so.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	process_id = system.tag.read(prebatch_path + "Process/processId").value
 	logger = system.util.getLogger(LOGGER_NAME)
@@ -987,6 +1130,11 @@ def cancel_running_recipe(prebatch_path):
 		logger = None
 
 def save_final_data(prebatch_path):
+	"""
+	Saves the final production data for the given Prebatch.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	logger = system.util.getLogger(LOGGER_NAME)
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	if LOG_INFO_EVENTS:
@@ -1019,6 +1167,11 @@ def save_final_data(prebatch_path):
 		logger = None
 
 def main(prebatch_path):
+	"""
+	Main function for the Prebatch process.
+	:param prebatch_path: Prebatch's path.
+	:return: None.
+	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
 	# The Reset Alarms button in the HMI should reset the Alarmed flag.
