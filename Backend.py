@@ -58,7 +58,7 @@ def machine_conditions_ready(prebatch_path):
 
 def clear_component(component_path):
 	"""
-	Initializes one specific component from an Execution Plan.
+	Initializes one specific component from a recipe.
 	:param component_path: Component's path.
 	:return: None.
 	"""
@@ -83,6 +83,12 @@ def clear_component(component_path):
 	system.tag.writeBlocking(component_path + "noInventoryValidation", False)
 
 def clear_all_components(recipe_path, prebatch_name):
+	"""
+	Clears all the components in the recipe.
+	:param recipe_path: Recipe's path.
+	:param prebatch_name: Prebatch's name for logging purposes.
+	:return: None.
+	"""
 	logger = system.util.getLogger(LOGGER_NAME)
 	if LOG_INFO_EVENTS:
 		logger.infof("[%s] clear_components() [start]", prebatch_name)
