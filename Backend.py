@@ -4,6 +4,7 @@
 # Rolando Urrea.
 # Cobalt Processworks.
 # 2025-12-14: initial release.
+# 2026-04-15: current release.
 
 # CONSTANTS.
 # Python 2.7 (Ignition's internal Python version, which does not support variable type forcing (VAR:type = value)).
