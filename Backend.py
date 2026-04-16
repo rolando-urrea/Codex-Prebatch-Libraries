@@ -8,7 +8,7 @@
 # CONSTANTS.
 # Python 2.7 (Ignition's internal Python version, which does not support variable type forcing (VAR:type = value)).
 # General.
-LOG_INFO_EVENTS = True
+ECHO = True
 LOGGER_NAME = "CodexPrebatchBackend"
 # Software database specifications.
 # Valid options: PostgreSQL ("PostgreSQL"), Microsoft SQL Server ("SQL Server").
@@ -90,12 +90,12 @@ def clear_all_components(recipe_path, prebatch_name):
 	:return: None.
 	"""
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] clear_components() [start]", prebatch_name)
 	# Clear the information for each component.
 	for i in range(1, POSITION_SLOTS + 1):
 		clear_component(recipe_path + "Components/c" + str("%02d" % i) + "/")
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] clear_components() [end]", prebatch_name)
 	logger = None
 
@@ -107,7 +107,7 @@ def clear_full_recipe(recipe_path, prebatch_name):
 	:return: None.
 	"""
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] clear_full_recipe() [start]", prebatch_name)
 	try:
 		# Initialize all the recipe's fields.
@@ -129,7 +129,7 @@ def clear_full_recipe(recipe_path, prebatch_name):
 	except:
 		logger.errorf("[%s] clear_full_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] clear_full_recipe() [end]", prebatch_name)
 		logger = None
 
@@ -141,7 +141,7 @@ def clear_production_recipe(recipe_path, prebatch_name):
 	:return: None.
 	"""
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] clear_production_recipe() [start]", prebatch_name)
 	try:
 		# Production recipes have a lot less information than full recipes.
@@ -155,7 +155,7 @@ def clear_production_recipe(recipe_path, prebatch_name):
 	except:
 		logger.errorf("[%s] clear_production_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] clear_production_recipe() [end]", prebatch_name)
 		logger = None
 
@@ -168,7 +168,7 @@ def copy_production_recipe(prebatch_name, source_recipe_path, target_recipe_path
 	:return: None.
 	"""
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] copy_production_recipe() [start]", prebatch_name)
 	try:
 		# Production recipes have a lot less information than full recipes.
@@ -190,7 +190,7 @@ def copy_production_recipe(prebatch_name, source_recipe_path, target_recipe_path
 	except:
 		logger.errorf("[%s] copy_production_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] copy_production_recipe() [end]", prebatch_name)
 		logger = None
 
@@ -202,23 +202,23 @@ def clear_all_recipes(prebatch_path):
 	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] clear_all_recipes() [start]", prebatch_name)
 	# Base (full) recipes.
 	recipes = ["baseRecipe"]
 	for recipe in recipes:
 		recipe_path = prebatch_path + "Process/" + recipe + "/"
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] clear_all_recipes() [do]: target: %s", prebatch_name, recipe_path)
 		clear_full_recipe(recipe_path, prebatch_name)
 	# Production (partial) recipes.
 	recipes = ["productionRecipe"]
 	for recipe in recipes:
 		recipe_path = prebatch_path + "Process/" + recipe + "/"
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] clear_all_recipes() [do]: target: %s", prebatch_name, recipe_path)
 		clear_production_recipe(recipe_path, prebatch_name)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] clear_all_recipes() [end]", prebatch_name)
 	logger = None
 
@@ -231,7 +231,7 @@ def load_recipe(prebatch_path, recipe_id):
 	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] load_recipe() [start]: %s", prebatch_name, recipe_id)
 	recipe_name = ""
 	try:
@@ -294,7 +294,7 @@ def load_recipe(prebatch_path, recipe_id):
 		logger.errorf("[%s] load_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] load_recipe() [end]: %s (%s)", prebatch_name, recipe_id, recipe_name)
 		logger = None
 
@@ -331,15 +331,15 @@ def clear_all_execution_plans(prebatch_path):
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	executions_plans = ["baseExecutionPlan", "productionExecutionPlan", "OPCProductionExecutionPlan"]
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] clear_execution_plans() [start]", prebatch_name)
 	for execution_plan in executions_plans:
 		execution_plan_path = prebatch_path + "Process/" + execution_plan + "/"
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] clear_execution_plans() [do]: target: %s", prebatch_name, execution_plan_path)
 		for i in range (1, POSITION_SLOTS + 1):
 			clear_execution_position(execution_plan_path + "/Positions/p" + str("%02d" % i) + "/")
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] clear_execution_plans() [end]", prebatch_name)
 	logger = None
 
@@ -378,7 +378,7 @@ def copy_execution_plan(prebatch_path, source_execution_plan_path, target_execut
 	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] copy_execution_plan(source: %s, target: %s) [start]", prebatch_name, source_execution_plan_path, target_execution_plan_path)
 	for i in range(1, POSITION_SLOTS + 1):
 		# Define the current positions' paths.
@@ -390,7 +390,7 @@ def copy_execution_plan(prebatch_path, source_execution_plan_path, target_execut
 		if process_unit != "":
 			position_cycles = system.tag.read(current_execution_position_path + "cycles").value
 			copy_execution_position(current_execution_position_path, current_target_execution_plan_path, position_cycles)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] copy_execution_plan(source: %s, target: %s) [end]", prebatch_name, source_execution_plan_path, target_execution_plan_path)
 	logger = None
 
@@ -427,7 +427,7 @@ def get_unit_from_capability(prebatch_path, capability):
 			return_value = system.tag.read(str(unit["fullPath"]) + "/name").value
 	if return_value == "":
 		return_value = get_default_unit(prebatch_path)
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger = system.util.getLogger(LOGGER_NAME)
 			logger.infof("[%s] get_unit_from_capability() [do]: no unit with the capability %s found; the default unit was assigned (%s)", prebatch_name, capability, return_value)
 			logger = None
@@ -444,7 +444,7 @@ def set_base_execution_plan(prebatch_path):
 	# The Production Execution Plan will do water estimation calculations and component partitioning.
 	# Hard dissolving tank, suction pump tank, heating tank, liquids tank and bayonet liquid concentrates will remain in their assigned units.
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
 		logger.infof("[%s] set_base_execution_plan() for %s [start]", prebatch_name, recipe_name)
 	try:
@@ -540,7 +540,7 @@ def set_base_execution_plan(prebatch_path):
 		logger.errorf("[%s] set_base_execution_plan() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
 			logger.infof("[%s] set_base_execution_plan() for %s [end]", prebatch_name, recipe_name)
 		logger = None
@@ -556,7 +556,7 @@ def set_unit_limit(prebatch_path, tank_path):
 	# Define the unit limit for this recipe/tank combination.
 	logger = system.util.getLogger(LOGGER_NAME)
 	recipe_name = system.tag.read(prebatch_path + "Process/baseRecipe/recipeName").value
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] set_unit_limit() for %s [start]", prebatch_name, recipe_name)
 	try:
 		recipe_path = prebatch_path + "Process/baseRecipe/"
@@ -565,13 +565,13 @@ def set_unit_limit(prebatch_path, tank_path):
 		tank = system.tag.read(prebatch_path + "Process/tank").value
 		tank_min_volume = system.tag.read(tank_path + "Par/minAgitationVolume").value
 		tank_max_volume = system.tag.read(tank_path + "Par/capacity").value
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] set_unit_limit() [do]: tank: %d, tank_min_volume: %.2f L, tank_max_volume: %.2f L", prebatch_name, tank, tank_min_volume, tank_max_volume)
 		max_units = 1
 		if recipe_volume > 0:
 			max_units = int(tank_max_volume / recipe_volume)
 		test_units = max_units
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] set_unit_limit() [do]: max_units: %d, volume: %.2f L", prebatch_name, max_units, recipe_volume * max_units)
 		recipe_water = 1.0
 		required_water = 0.0
@@ -644,7 +644,7 @@ def set_unit_limit(prebatch_path, tank_path):
 		logger.errorf("[%s] set_unit_limit() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] set_unit_limit() for %s [end]", prebatch_name, recipe_name)
 		logger = None
 
@@ -659,7 +659,7 @@ def calculate(prebatch_path, tank_path, units):
 	import math
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] calculate() [start]", prebatch_name)
 	try:
 		base_recipe_path = prebatch_path + "Process/baseRecipe/"
@@ -668,7 +668,7 @@ def calculate(prebatch_path, tank_path, units):
 		recipe_name = system.tag.read(base_recipe_path + "recipeName").value
 		# Get the tank's properties.
 		tank_min_volume = system.tag.read(tank_path + "Par/minAgitationVolume").value
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] calculate() [do]: recipe_id: %s, recipe_name: %s, units: %d", prebatch_name, recipe_id, recipe_name, units)
 		# Update the production recipe.
 		system.tag.writeBlocking(production_recipe_path + "recipeType", system.tag.read(base_recipe_path + "recipeType").value)
@@ -745,7 +745,7 @@ def calculate(prebatch_path, tank_path, units):
 					# Liquids poured directly into the tank must use the calculated water but with no cycles calculation.
 					system.tag.writeBlocking(current_production_position_path + "water", calculated_water)
 					system.tag.writeBlocking(current_production_position_path + "cycles", 1)
-				if LOG_INFO_EVENTS:
+				if ECHO:
 					logger.infof("[%s] calculate() [do]: unit %s found for %s; cycles = %d", prebatch_name, process_unit, components, int(cycles))
 				system.tag.writeBlocking(prebatch_path + "Process/maxPosition", i)
 		# Set the Calculated Units.
@@ -754,7 +754,7 @@ def calculate(prebatch_path, tank_path, units):
 		logger.errorf("[%s] calculate() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] calculate() [end]", prebatch_name)
 		logger = None
 
@@ -766,7 +766,7 @@ def save_process_data(prebatch_path):
 	"""
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] save_process_data() [start]", prebatch_name)
 	last_stored_process_id = None
 	recipe_id = ""
@@ -813,7 +813,7 @@ def save_process_data(prebatch_path):
 		logger.errorf("[%s] save_process_data() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] save_process_data() [do]: recipe_id: %s, recipe_name: %s, process_id: %d", prebatch_name, recipe_id, recipe_name, process_id)
 			logger.infof("[%s] save_process_data() [end]", prebatch_name)
 		logger = None
@@ -1051,7 +1051,7 @@ def check_inventory_completion(prebatch_path):
 			system.tag.write(prebatch_path + "/Process/Inventory/correct", result)
 			# Send a message to the logger only if there's a change in the correct flag.
 			if current_correct_flag != result:
-				if LOG_INFO_EVENTS:
+				if ECHO:
 					prebatch_name = system.tag.read(prebatch_path + "/Process/prebatchName").value
 					logger.infof("[%s] check_inventory_completion() [do]: correct: %s", prebatch_name, result)
 				system.tag.writeBlocking(prebatch_path + "Process/Inventory/correct", result)
@@ -1071,7 +1071,7 @@ def save_inventory(prebatch_path):
 	logger = system.util.getLogger(LOGGER_NAME)
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	prebatch_number = system.tag.read(prebatch_path + "Process/prebatchNumber").value
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] save_inventory() [start]", prebatch_name)
 	try:
 		# Transfers the records from the capture table to the history one.
@@ -1100,7 +1100,7 @@ def save_inventory(prebatch_path):
 		logger.errorf("[%s] save_inventory() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] store_inventory() [end]", prebatch_name)
 		logger = None
 
@@ -1113,7 +1113,7 @@ def cancel_running_recipe(prebatch_path):
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
 	process_id = system.tag.read(prebatch_path + "Process/processId").value
 	logger = system.util.getLogger(LOGGER_NAME)
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%s] cancel_running_recipe() [start]", prebatch_name)
 	try:
 		# Prevent error from a previously inserted canceled recipe id.
@@ -1125,7 +1125,7 @@ def cancel_running_recipe(prebatch_path):
 		logger.errorf("[%s] cancel_running_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] cancel_running_recipe() [end]", prebatch_name)
 		logger = None
 
@@ -1137,7 +1137,7 @@ def save_final_data(prebatch_path):
 	"""
 	logger = system.util.getLogger(LOGGER_NAME)
 	prebatch_name = system.tag.read(prebatch_path + "Process/prebatchName").value
-	if LOG_INFO_EVENTS:
+	if ECHO:
 		logger.infof("[%S] save_final_data() [start]", prebatch_name)
 	try:
 		process_id = system.tag.read(prebatch_path + "Process/processId").value
@@ -1162,7 +1162,7 @@ def save_final_data(prebatch_path):
 		logger.errorf("[%s] save_final_data() [error]: %s", prebatch_name, str(sys.exc_info()))
 		system.tag.writeBlocking(prebatch_path + "/Process/backendAlarmed", True)
 	finally:
-		if LOG_INFO_EVENTS:
+		if ECHO:
 			logger.infof("[%s] save_final_data() [end]", prebatch_name)
 		logger = None
 
@@ -1194,7 +1194,7 @@ def main(prebatch_path):
 							coordinate(prebatch_path)
 					else:
 						system.tag.writeBlocking(prebatch_path + "Process/processing", True)
-						if LOG_INFO_EVENTS:
+						if ECHO:
 							logger.infof("[%s] main() [do]: %s", prebatch_name, "--- SYSTEM STARTED ---")
 						save_process_data(prebatch_path)
 						system.tag.writeBlocking(prebatch_path + "Process/processing", False)
@@ -1224,7 +1224,7 @@ def main(prebatch_path):
 								copy_execution_plan(prebatch_path, prebatch_path + "Process/productionExecutionPlan/",
 													prebatch_path + "Process/OPCProductionExecutionPlan/")
 								copy_production_recipe(prebatch_name, prebatch_path + "Process/productionRecipe/", prebatch_path + "Process/OPCProductionRecipe/")
-								if LOG_INFO_EVENTS:
+								if ECHO:
 									logger.infof("[%s] main() [do]: %s", prebatch_name, "--- SYSTEM READY TO START ---")
 								system.tag.writeBlocking(prebatch_path + "Process/dataTransferred", True)
 								system.tag.writeBlocking(prebatch_path + "Process/processing", False)
@@ -1258,13 +1258,13 @@ def main(prebatch_path):
 							if BARCODE_EVALUATION:
 								save_inventory(prebatch_path)
 							save_final_data(prebatch_path)
-					if finalized and LOG_INFO_EVENTS:
+					if finalized and ECHO:
 						logger.infof("[%s] main() [do]: finalizing", prebatch_name)
 					initialize_flags(prebatch_path)
 					initialize_inventory_flags(prebatch_path)
 					clear_all_recipes(prebatch_path)
 					clear_all_execution_plans(prebatch_path)
-					if LOG_INFO_EVENTS:
+					if ECHO:
 						logger.infof("[%s] main() [do]: %s", prebatch_name, "--- SYSTEM FINISHED ---")
 					system.tag.writeBlocking(prebatch_path + "Process/processing", False)
 	logger = None
