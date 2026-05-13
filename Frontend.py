@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Prebatch Frontend function library v2.0.0 ALPHA.
 # To be used on Inductive Automation's Ignition platform.
 #
@@ -8,6 +9,12 @@
 # CONSTANTS.
 # Python 2.7 (Ignition's internal Python version, which does not support variable type forcing (VAR:type = value)).
 DATABASE = "Process"
+COMPONENT_SLOTS = 16
+PACKAGE_COMPONENT_SLOTS = 4
+VALID_BARCODE_LENGTHS = (36, 38)
+
+def _inventory_tag(prebatch_path, tag):
+	return prebatch_path + "Process/Inventory/" + tag
 
 def analyze_barcode(prebatch_path, barcode):
 	# Determines the id and string quality from the barcode.
@@ -30,7 +37,7 @@ def analyze_barcode(prebatch_path, barcode):
 	is_expired = False
 	already_captured = False
 	# Evaluate the barcode size.
-	if (len(clean_code) == 36) or (len(clean_code) == 38):
+	if len(clean_code) in VALID_BARCODE_LENGTHS:
 		length_is_right = True
 	result += "Evaluando: " + clean_code + "\n"
 	presentation_id = ""
@@ -44,21 +51,28 @@ def analyze_barcode(prebatch_path, barcode):
 		hostname = system.tag.read("[System]Client/Network/Hostname").value
 		username = system.tag.read("[System]Client/User/Username").value
 		presentation_id = clean_code[3:10]
-		presentation_batch = int(clean_code[12:22])
+		batch_text = clean_code[12:22]
 		# Some codes have full-length year.
 		presentation_expiration = ""
 		if len(clean_code) == 36:
 			presentation_expiration = clean_code[24:30]
 		elif len(clean_code) == 38:
 			presentation_expiration = clean_code[26:32]
-		expiration_evaluation = presentation_expiration + " 12:00:00"
-		date_format = "%y%m%d %H:%M:%S"
-		expiration_date = datetime.strptime(expiration_evaluation, date_format)
-		if expiration_date < datetime.now():
-			is_expired = True
-		presentation_serial = int(clean_code[-4:])
-		if (presentation_batch > 0) and (presentation_serial > 0):
-			is_complete = True
+		serial_text = clean_code[-4:]
+		if batch_text.isdigit() and presentation_expiration.isdigit() and serial_text.isdigit():
+			presentation_batch = int(batch_text)
+			expiration_evaluation = presentation_expiration + " 12:00:00"
+			date_format = "%y%m%d %H:%M:%S"
+			try:
+				expiration_date = datetime.strptime(expiration_evaluation, date_format)
+			except ValueError:
+				expiration_date = None
+			if expiration_date is not None:
+				if expiration_date < datetime.now():
+					is_expired = True
+				presentation_serial = int(serial_text)
+				if (presentation_batch > 0) and (presentation_serial > 0):
+					is_complete = True
 	# Determine if this presentation exists.
 	if is_complete:
 		table = system.db.runPrepQuery("SELECT * FROM pb_component_presentations_current WHERE presentation_id = ?", [presentation_id], DATABASE)
@@ -68,7 +82,7 @@ def analyze_barcode(prebatch_path, barcode):
 			is_compatible = True
 			tag_path = prebatch_path + "Process/baseRecipe/Components/"
 			# Field loop.
-			for i in range(1, 5):
+			for i in range(1, PACKAGE_COMPONENT_SLOTS + 1):
 				# Only for valid components in the package.
 				# There should be only one row in the table.
 				current_package_recipe_reference = table[0]["recipe_reference"]
@@ -77,8 +91,8 @@ def analyze_barcode(prebatch_path, barcode):
 				if current_package_component_id != "-":
 					concentrate_found = False
 					# Component slot loop.
-					for j in range(1, 16):
-						current_recipe_component = system.tag.read(tag_path + "c" + ("%02d" % j) + "/id").value
+					for j in range(1, COMPONENT_SLOTS + 1):
+						current_recipe_component = system.tag.read(tag_path + "c" + ("%02d" % j) + "/componentId").value
 						if current_package_component_id == current_recipe_component:
 							concentrate_found = True
 					if not concentrate_found:
@@ -91,7 +105,7 @@ def analyze_barcode(prebatch_path, barcode):
 		table = system.db.runPrepQuery("SELECT presentation_id FROM pb_inventory_capture WHERE presentation_id = ? AND presentation_batch = ? AND presentation_serial = ?", [presentation_id, presentation_batch, presentation_serial], DATABASE)
 		if len(table) > 0:
 			already_captured = True
-			system.tag.writeBlocking(prebatch_path + "Process/Inventory/currentBarcodeRepeated", True)
+			system.tag.writeBlocking(_inventory_tag(prebatch_path, "currentBarcodeRepeated"), True)
 		# Don't wait for the garbage collector to release the table's used memory.
 		table = None
 	# Finally, search for the record in the history table.
@@ -112,10 +126,10 @@ def analyze_barcode(prebatch_path, barcode):
 		system.db.runPrepUpdate(my_query, [prebatch_number, hostname, username, presentation_id, presentation_batch, presentation_expiration, presentation_serial], DATABASE)
 		# Inform if this package is compatible or not.
 		if is_compatible:
-			system.tag.writeBlocking(prebatch_path + "Process/Inventory/currentBarcodeIsCorrect", True)
+			system.tag.writeBlocking(_inventory_tag(prebatch_path, "currentBarcodeIsCorrect"), True)
 		else:
 			result += "\nERROR: este paquete no es compatible con la receta seleccionada"
-			system.tag.writeBlocking(prebatch_path + "Process/Inventory/wrongCodesExist", True)
+			system.tag.writeBlocking(_inventory_tag(prebatch_path, "wrongCodesExist"), True)
 	else:
 		if already_captured:
 			result += "Paquete ya capturado; Código: " + presentation_id + ", Lote: " + str(presentation_batch) + ", Caducidad: " + presentation_expiration + ", Consecutivo: " + str(presentation_serial)
@@ -132,5 +146,5 @@ def analyze_barcode(prebatch_path, barcode):
 			elif is_expired:
 				reason += "concentrados caducados"
 			result += "ERROR: " + reason
-			system.tag.writeBlocking(prebatch_path + "/Process/Inventory/wrongCodesExist", True)
+			system.tag.writeBlocking(_inventory_tag(prebatch_path, "wrongCodesExist"), True)
 	return result

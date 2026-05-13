@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Prebatch Backend function library v2.0.0 BETA.
 # To be used on Inductive Automation's Ignition platform.
 #
@@ -5,6 +6,9 @@
 # Cobalt Processworks.
 # 2025-12-14: initial release.
 # 2026-04-15: current release.
+
+import math
+import sys
 
 # CONSTANTS.
 # Python 2.7 (Ignition's internal Python version, which does not support variable type forcing (VAR:type = value)).
@@ -24,6 +28,98 @@ LIMIT_UNIT_SELECTION = False
 SWEETENER_DENSITY = 1.30
 SIMPLE_SYRUP_BRIX = 0.60
 FRUCTOSE_SOLIDS = 0.77
+
+# Common tag definitions.
+COMPONENT_TAG_DEFAULTS = [
+	("componentId", ""),
+	("componentName", ""),
+	("componentVersion", 0),
+	("transferPosition", 0),
+	("type", 0),
+	("mass", 0),
+	("water", 0),
+	("hardDissolving", False),
+	("vacuumPump", False),
+	("bayonet", False),
+	("liquidsTank", False),
+	("IBC", False),
+	("circulate", False),
+	("agitationAutomatic", False),
+	("agitationDuration", 0),
+	("requiresHeating", False),
+	("heatingSetpoint", 0),
+	("noInventoryValidation", False),
+]
+FULL_RECIPE_TAG_DEFAULTS = [
+	("recipeId", ""),
+	("recipeName", ""),
+	("recipeType", 0),
+	("recipeVersion", 0),
+	("userName", ""),
+	("updateTime", None),
+	("density", 1),
+	("brix", 0),
+	("mass", 0),
+	("volume", 0),
+	("sucrose", 0),
+	("fructose", 0),
+	("water", 0),
+]
+PRODUCTION_RECIPE_FIELDS = ["recipeType", "mass", "volume", "sucrose", "fructose", "water"]
+PRODUCTION_RECIPE_DEFAULTS = [(field, 0) for field in PRODUCTION_RECIPE_FIELDS]
+EXECUTION_POSITION_TAG_DEFAULTS = [
+	("agitationAutomatic", False),
+	("agitationDuration", 0),
+	("bayonet", False),
+	("components", ""),
+	("currentCycle", 0),
+	("cycles", 0),
+	("hardDissolving", False),
+	("heatingSetpoint", 0),
+	("liquidsTank", False),
+	("mass", 0),
+	("processUnit", ""),
+	("requiresHeating", False),
+	("solidsVacuum", False),
+	("transferPosition", 0),
+	("type", 0),
+	("water", 0),
+]
+EXECUTION_POSITION_COPY_FIELDS = [
+	"agitationAutomatic",
+	"agitationDuration",
+	"bayonet",
+	"components",
+	"hardDissolving",
+	"heatingSetpoint",
+	"liquidsTank",
+	"mass",
+	"processUnit",
+	"requiresHeating",
+	"solidsVacuum",
+	"transferPosition",
+	"type",
+	"water",
+]
+
+def _write_tag_values(base_path, tag_values):
+	"""Writes multiple tags under the same base path in one Ignition call."""
+	paths = []
+	values = []
+	for tag, value in tag_values:
+		paths.append(base_path + tag)
+		values.append(value)
+	system.tag.writeBlocking(paths, values)
+
+
+def _write_tag_fields(base_path, fields, values):
+	"""Writes values to the provided field names under the same base path."""
+	system.tag.writeBlocking([base_path + field for field in fields], values)
+
+
+def _read_tag_fields(base_path, fields):
+	"""Reads multiple fields under the same base path and returns their values."""
+	return [qualified_value.value for qualified_value in system.tag.readBlocking([base_path + field for field in fields])]
 
 def machine_conditions_ready(prebatch_path):
 	"""
@@ -64,24 +160,7 @@ def clear_component(component_path):
 	:return: None.
 	"""
 	# Don't consider this function in the logger's scope; it would produce too much detail.
-	system.tag.writeBlocking(component_path + "componentId", "")
-	system.tag.writeBlocking(component_path + "componentName", "")
-	system.tag.writeBlocking(component_path + "componentVersion", 0)
-	system.tag.writeBlocking(component_path + "transferPosition", 0)
-	system.tag.writeBlocking(component_path + "type", 0)
-	system.tag.writeBlocking(component_path + "mass", 0)
-	system.tag.writeBlocking(component_path + "water", 0)
-	system.tag.writeBlocking(component_path + "hardDissolving", False)
-	system.tag.writeBlocking(component_path + "vacuumPump", False)
-	system.tag.writeBlocking(component_path + "bayonet", False)
-	system.tag.writeBlocking(component_path + "liquidsTank", False)
-	system.tag.writeBlocking(component_path + "IBC", False)
-	system.tag.writeBlocking(component_path + "circulate", False)
-	system.tag.writeBlocking(component_path + "agitationAutomatic", False)
-	system.tag.writeBlocking(component_path + "agitationDuration", 0)
-	system.tag.writeBlocking(component_path + "requiresHeating", False)
-	system.tag.writeBlocking(component_path + "heatingSetpoint", 0)
-	system.tag.writeBlocking(component_path + "noInventoryValidation", False)
+	_write_tag_values(component_path, COMPONENT_TAG_DEFAULTS)
 
 def clear_all_components(recipe_path, prebatch_name):
 	"""
@@ -112,19 +191,7 @@ def clear_full_recipe(recipe_path, prebatch_name):
 		logger.infof("[%s] clear_full_recipe() [start]", prebatch_name)
 	try:
 		# Initialize all the recipe's fields.
-		system.tag.writeBlocking(recipe_path + "recipeId", "")
-		system.tag.writeBlocking(recipe_path + "recipeName", "")
-		system.tag.writeBlocking(recipe_path + "recipeType", 0)
-		system.tag.writeBlocking(recipe_path + "recipeVersion", 0)
-		system.tag.writeBlocking(recipe_path + "userName", "")
-		system.tag.writeBlocking(recipe_path + "updateTime", None)
-		system.tag.writeBlocking(recipe_path + "density", 1)
-		system.tag.writeBlocking(recipe_path + "brix", 0)
-		system.tag.writeBlocking(recipe_path + "mass", 0)
-		system.tag.writeBlocking(recipe_path + "volume", 0)
-		system.tag.writeBlocking(recipe_path + "sucrose", 0)
-		system.tag.writeBlocking(recipe_path + "fructose", 0)
-		system.tag.writeBlocking(recipe_path + "water", 0)
+		_write_tag_values(recipe_path, FULL_RECIPE_TAG_DEFAULTS)
 		# Clear the components.
 		clear_all_components(recipe_path, prebatch_name)
 	except:
@@ -147,12 +214,7 @@ def clear_production_recipe(recipe_path, prebatch_name):
 	try:
 		# Production recipes have a lot less information than full recipes.
 		# The Execution Plans have all the details about concentrates, so there's no need to perform calculations on the components.
-		system.tag.writeBlocking(recipe_path + "recipeType", 0)
-		system.tag.writeBlocking(recipe_path + "mass", 0)
-		system.tag.writeBlocking(recipe_path + "volume", 0)
-		system.tag.writeBlocking(recipe_path + "sucrose", 0)
-		system.tag.writeBlocking(recipe_path + "fructose", 0)
-		system.tag.writeBlocking(recipe_path + "water", 0)
+		_write_tag_values(recipe_path, PRODUCTION_RECIPE_DEFAULTS)
 	except:
 		logger.errorf("[%s] clear_production_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
@@ -174,20 +236,8 @@ def copy_production_recipe(prebatch_name, source_recipe_path, target_recipe_path
 	try:
 		# Production recipes have a lot less information than full recipes.
 		# The Execution Plans have all the details about concentrates, so there's no need to perform calculations on the components.
-		# Load data from the source recipe (doing so is easier to understand).
-		recipe_type = system.tag.read(source_recipe_path + "recipeType").value
-		mass = system.tag.read(source_recipe_path + "mass").value
-		volume = system.tag.read(source_recipe_path + "volume").value
-		sucrose = system.tag.read(source_recipe_path + "sucrose").value
-		fructose = system.tag.read(source_recipe_path + "fructose").value
-		water = system.tag.read(source_recipe_path + "water").value
-		# Transfer the data to the target recipe.
-		system.tag.writeBlocking(target_recipe_path + "recipeType", recipe_type)
-		system.tag.writeBlocking(target_recipe_path + "mass", mass)
-		system.tag.writeBlocking(target_recipe_path + "volume", volume)
-		system.tag.writeBlocking(target_recipe_path + "sucrose", sucrose)
-		system.tag.writeBlocking(target_recipe_path + "fructose", fructose)
-		system.tag.writeBlocking(target_recipe_path + "water", water)
+		# Load and transfer production data in the same field order.
+		_write_tag_fields(target_recipe_path, PRODUCTION_RECIPE_FIELDS, _read_tag_fields(source_recipe_path, PRODUCTION_RECIPE_FIELDS))
 	except:
 		logger.errorf("[%s] copy_production_recipe() [error]: %s", prebatch_name, str(sys.exc_info()))
 	finally:
@@ -246,20 +296,22 @@ def load_recipe(prebatch_path, recipe_id):
 			# This function only affects the base recipe.
 			recipe_path = prebatch_path + "Process/baseRecipe/"
 			recipe_data_row = recipe_table[0]
-			system.tag.writeBlocking(recipe_path + "recipeId", recipe_data_row["recipe_id"])
-			system.tag.writeBlocking(recipe_path + "recipeName", recipe_data_row["recipe_name"])
 			recipe_name = recipe_data_row["recipe_name"]
-			system.tag.writeBlocking(recipe_path + "recipeType", recipe_data_row["recipe_type"])
-			system.tag.writeBlocking(recipe_path + "recipeVersion", recipe_data_row["recipe_version"])
-			system.tag.writeBlocking(recipe_path + "userName", recipe_data_row["user_name"])
-			system.tag.writeBlocking(recipe_path + "updateTime", recipe_data_row["update_time"])
-			system.tag.writeBlocking(recipe_path + "density", recipe_data_row["density"])
-			system.tag.writeBlocking(recipe_path + "brix", recipe_data_row["brix"])
-			system.tag.writeBlocking(recipe_path + "mass", recipe_data_row["mass"])
-			system.tag.writeBlocking(recipe_path + "volume", recipe_data_row["mass"] / recipe_data_row["density"])
-			system.tag.writeBlocking(recipe_path + "sucrose", recipe_data_row["sucrose"])
-			system.tag.writeBlocking(recipe_path + "fructose", recipe_data_row["fructose"])
-			system.tag.writeBlocking(recipe_path + "water", recipe_data_row["water"])
+			_write_tag_values(recipe_path, [
+				("recipeId", recipe_data_row["recipe_id"]),
+				("recipeName", recipe_name),
+				("recipeType", recipe_data_row["recipe_type"]),
+				("recipeVersion", recipe_data_row["recipe_version"]),
+				("userName", recipe_data_row["user_name"]),
+				("updateTime", recipe_data_row["update_time"]),
+				("density", recipe_data_row["density"]),
+				("brix", recipe_data_row["brix"]),
+				("mass", recipe_data_row["mass"]),
+				("volume", recipe_data_row["mass"] / recipe_data_row["density"]),
+				("sucrose", recipe_data_row["sucrose"]),
+				("fructose", recipe_data_row["fructose"]),
+				("water", recipe_data_row["water"]),
+			])
 			# Get the information for each component.
 			for i in range (1, POSITION_SLOTS + 1):
 				component_path = recipe_path + "Components/c" + str("%02d" % i) + "/"
@@ -270,24 +322,26 @@ def load_recipe(prebatch_path, recipe_id):
 					clear_component(component_path)
 				else:
 					component_data_row = component_table[0]
-					system.tag.writeBlocking(component_path + "componentId", component_data_row["component_id"])
-					system.tag.writeBlocking(component_path + "componentName", component_data_row["component_name"])
-					system.tag.writeBlocking(component_path + "componentVersion", component_data_row["component_version"])
-					system.tag.writeBlocking(component_path + "transferPosition", [recipe_data_row["c" + str("%02d" % i) + "_pos"]])
-					system.tag.writeBlocking(component_path + "type", component_data_row["component_type"])
-					system.tag.writeBlocking(component_path + "mass", component_data_row["mass"])
-					system.tag.writeBlocking(component_path + "water", component_data_row["water"])
-					system.tag.writeBlocking(component_path + "hardDissolving", component_data_row["hard_dissolving"])
-					system.tag.writeBlocking(component_path + "vacuumPump", component_data_row["vacuum_pump"])
-					system.tag.writeBlocking(component_path + "bayonet", component_data_row["bayonet"])
-					system.tag.writeBlocking(component_path + "liquidsTank", component_data_row["liquids_tank"])
-					system.tag.writeBlocking(component_path + "IBC", component_data_row["ibc"])
-					system.tag.writeBlocking(component_path + "circulate", component_data_row["circulate"])
-					system.tag.writeBlocking(component_path + "agitationAutomatic", component_data_row["agitation_duration"] > 0)
-					system.tag.writeBlocking(component_path + "agitationDuration", component_data_row["agitation_duration"])
-					system.tag.writeBlocking(component_path + "requiresHeating", component_data_row["heating_setpoint"] > 0)
-					system.tag.writeBlocking(component_path + "heatingSetpoint", component_data_row["heating_setpoint"])
-					system.tag.writeBlocking(component_path + "noInventoryValidation", component_data_row["no_inventory_validation"])
+					_write_tag_values(component_path, [
+						("componentId", component_data_row["component_id"]),
+						("componentName", component_data_row["component_name"]),
+						("componentVersion", component_data_row["component_version"]),
+						("transferPosition", recipe_data_row["c" + str("%02d" % i) + "_pos"]),
+						("type", component_data_row["component_type"]),
+						("mass", component_data_row["mass"]),
+						("water", component_data_row["water"]),
+						("hardDissolving", component_data_row["hard_dissolving"]),
+						("vacuumPump", component_data_row["vacuum_pump"]),
+						("bayonet", component_data_row["bayonet"]),
+						("liquidsTank", component_data_row["liquids_tank"]),
+						("IBC", component_data_row["ibc"]),
+						("circulate", component_data_row["circulate"]),
+						("agitationAutomatic", component_data_row["agitation_duration"] > 0),
+						("agitationDuration", component_data_row["agitation_duration"]),
+						("requiresHeating", component_data_row["heating_setpoint"] > 0),
+						("heatingSetpoint", component_data_row["heating_setpoint"]),
+						("noInventoryValidation", component_data_row["no_inventory_validation"]),
+					])
 				component_table = None
 		recipe_table = None
 		system.tag.writeBlocking(prebatch_path + "/Process/loaded", True)
@@ -306,22 +360,7 @@ def clear_execution_position(position_path):
 	:return: None.
 	"""
 	# Don't consider this function in the logger's scope; it would produce too much detail.
-	system.tag.writeBlocking(position_path + "agitationAutomatic", False)
-	system.tag.writeBlocking(position_path + "agitationDuration", 0)
-	system.tag.writeBlocking(position_path + "bayonet", False)
-	system.tag.writeBlocking(position_path + "components", "")
-	system.tag.writeBlocking(position_path + "currentCycle", 0)
-	system.tag.writeBlocking(position_path + "cycles", 0)
-	system.tag.writeBlocking(position_path + "hardDissolving", False)
-	system.tag.writeBlocking(position_path + "heatingSetpoint", 0)
-	system.tag.writeBlocking(position_path + "liquidsTank", False)
-	system.tag.writeBlocking(position_path + "mass", 0)
-	system.tag.writeBlocking(position_path + "processUnit", "")
-	system.tag.writeBlocking(position_path + "requiresHeating", False)
-	system.tag.writeBlocking(position_path + "solidsVacuum", False)
-	system.tag.writeBlocking(position_path + "transferPosition", 0)
-	system.tag.writeBlocking(position_path + "type", 0)
-	system.tag.writeBlocking(position_path + "water", 0)
+	_write_tag_values(position_path, EXECUTION_POSITION_TAG_DEFAULTS)
 
 def clear_all_execution_plans(prebatch_path):
 	"""
@@ -353,21 +392,8 @@ def copy_execution_position(source_position_path, target_position_path, cycles):
 	:return: None.
 	"""
 	# Don't consider this function in the logger's scope; it would produce too much detail.
-	system.tag.writeBlocking(target_position_path + "agitationAutomatic", system.tag.read(source_position_path + "agitationAutomatic").value)
-	system.tag.writeBlocking(target_position_path + "agitationDuration", system.tag.read(source_position_path + "agitationDuration").value)
-	system.tag.writeBlocking(target_position_path + "bayonet", system.tag.read(source_position_path + "bayonet").value)
-	system.tag.writeBlocking(target_position_path + "components", system.tag.read(source_position_path + "components").value)
-	system.tag.writeBlocking(target_position_path + "hardDissolving", system.tag.read(source_position_path + "hardDissolving").value)
-	system.tag.writeBlocking(target_position_path + "heatingSetpoint", system.tag.read(source_position_path + "heatingSetpoint").value)
-	system.tag.writeBlocking(target_position_path + "liquidsTank", system.tag.read(source_position_path + "liquidsTank").value)
-	system.tag.writeBlocking(target_position_path + "mass", system.tag.read(source_position_path + "mass").value)
-	system.tag.writeBlocking(target_position_path + "processUnit", system.tag.read(source_position_path + "processUnit").value)
-	system.tag.writeBlocking(target_position_path + "requiresHeating", system.tag.read(source_position_path + "requiresHeating").value)
-	system.tag.writeBlocking(target_position_path + "solidsVacuum", system.tag.read(source_position_path + "solidsVacuum").value)
-	system.tag.writeBlocking(target_position_path + "transferPosition", system.tag.read(source_position_path + "transferPosition").value)
-	system.tag.writeBlocking(target_position_path + "type", system.tag.read(source_position_path + "type").value)
-	system.tag.writeBlocking(target_position_path + "water", system.tag.read(source_position_path + "water").value)
-	system.tag.writeBlocking(target_position_path + "cycles", cycles)
+	values = _read_tag_fields(source_position_path, EXECUTION_POSITION_COPY_FIELDS)
+	_write_tag_fields(target_position_path, EXECUTION_POSITION_COPY_FIELDS + ["cycles"], values + [cycles])
 
 def copy_execution_plan(prebatch_path, source_execution_plan_path, target_execution_plan_path):
 	"""
