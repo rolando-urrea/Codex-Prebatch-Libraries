@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Prebatch Backend Batch Management Link function library v2.0.0 BETA.
 # This set of functions allows the interaction between the Ignition Backend and Batch Management.
 # To be used on Inductive Automation's Ignition platform.
